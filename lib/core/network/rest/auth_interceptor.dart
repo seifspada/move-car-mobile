@@ -1,8 +1,10 @@
 // lib/core/network/rest/auth_interceptor.dart
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthInterceptor extends Interceptor {
   final Ref ref;
@@ -16,11 +18,12 @@ class AuthInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     // Ne pas ajouter le token sur les routes d'auth
-    final isAuthRoute = options.path.contains('/auth/login') ||
+    final isAuthRoute =
+        options.path.contains('/auth/login') ||
         options.path.contains('/auth/register');
 
     if (!isAuthRoute) {
-      final token = await _storage.read(key: 'access_token');
+      final token = await _readToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
       }
@@ -30,12 +33,9 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(
-    DioException err,
-    ErrorInterceptorHandler handler,
-  ) async {
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      await _storage.delete(key: 'access_token');
+      await _deleteToken();
     }
 
     // Sur Chrome, DioException [unknown] avec response null = CORS sur erreur
@@ -52,5 +52,22 @@ class AuthInterceptor extends Interceptor {
     }
 
     handler.next(err);
+  }
+
+  Future<String?> _readToken() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('access_token');
+    }
+    return _storage.read(key: 'access_token');
+  }
+
+  Future<void> _deleteToken() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('access_token');
+      return;
+    }
+    await _storage.delete(key: 'access_token');
   }
 }

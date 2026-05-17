@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:convoyeur_mobile/app/theme/app_colors.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../missions/presentation/providers/mission_providers.dart';
+import 'notification_panel.dart';
 
 class TopBar extends ConsumerStatefulWidget {
   const TopBar({super.key});
@@ -42,7 +44,8 @@ class _TopBarState extends ConsumerState<TopBar>
 
   @override
   Widget build(BuildContext context, ) {
-    final user = ref.watch(authProvider).user;
+final authState = ref.watch(authProvider);
+final user = authState.isAuthenticated ? authState.user : null;
 
     return FadeTransition(
       opacity: _fadeIn,
@@ -181,12 +184,12 @@ class _AnimatedAvatar extends StatelessWidget {
 }
 
 // ── Bouton notification avec badge animé ───────────────────
-class _NotificationButton extends StatefulWidget {
+class _NotificationButton extends ConsumerStatefulWidget {
   @override
-  State<_NotificationButton> createState() => _NotificationButtonState();
+  ConsumerState<_NotificationButton> createState() => _NotificationButtonState();
 }
 
-class _NotificationButtonState extends State<_NotificationButton>
+class _NotificationButtonState extends ConsumerState<_NotificationButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _badgeCtrl;
   late final Animation<double> _badgeScale;
@@ -212,8 +215,14 @@ class _NotificationButtonState extends State<_NotificationButton>
 
   @override
   Widget build(BuildContext context) {
+    // Nombre d'alertes actives pour le badge
+    final alertesAsync = ref.watch(myAlertesProvider);
+    final int badgeCount = alertesAsync.whenOrNull(
+      data: (list) => list.where((a) => a.actif).length,
+    ) ?? 0;
+
     return GestureDetector(
-      onTap: () {},
+      onTap: () => showNotificationPanel(context),
       child: Container(
         width: 42,
         height: 42,
@@ -230,29 +239,40 @@ class _NotificationButtonState extends State<_NotificationButton>
               color: AppColors.textSecondary,
               size: 22,
             ),
-            // Badge pulsant
-            Positioned(
-              top: 8,
-              right: 8,
-              child: ScaleTransition(
-                scale: _badgeScale,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.5),
-                        blurRadius: 4,
-                        spreadRadius: 1,
+            // Badge pulsant — visible seulement s'il y a des alertes actives
+            if (badgeCount > 0)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: ScaleTransition(
+                  scale: _badgeScale,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        badgeCount > 9 ? '9+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

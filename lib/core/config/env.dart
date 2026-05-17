@@ -3,16 +3,21 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class Env {
   static String get apiUrl =>
-      dotenv.env['API_URL'] ?? 'http://localhost:3000';
+      dotenv.env['API_URL'] ??
+      'https://movecar-backend.onrender.com';
 
   static String get baseUrl =>
-      dotenv.env['BASE_URL'] ?? 'http://localhost:3000';
+      dotenv.env['BASE_URL'] ??
+      'https://movecar-backend.onrender.com';
 
   static String get graphqlUrl =>
-      dotenv.env['GRAPHQL_URL'] ?? 'http://localhost:3000/graphql';
+      dotenv.env['GRAPHQL_URL'] ??
+      'https://movecar-backend.onrender.com/graphql';
 
   static String get graphqlWsUrl =>
-      graphqlUrl.replaceFirst('https', 'wss').replaceFirst('http', 'ws');
+      graphqlUrl
+          .replaceFirst('https://', 'wss://')
+          .replaceFirst('http://', 'ws://');
 
   static String get jwtSecret =>
       dotenv.env['JWT_SECRET'] ?? '';

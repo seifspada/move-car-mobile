@@ -6,9 +6,9 @@ class AppColors {
   AppColors._();
 
   // ── Brand ──────────────────────────────────────────────
-  static const Color primary         = Color(0xFFEA580C); // orange-600
-  static const Color primaryLight    = Color(0xFFFB923C); // orange-400
-  static const Color primaryDark     = Color(0xFFC2410C); // orange-700
+  static const Color primary         = Color(0xFFEA580C);
+  static const Color primaryLight    = Color(0xFFFB923C);
+  static const Color primaryDark     = Color(0xFFC2410C);
   static const Color primaryGlow     = Color(0x40EA580C); // 25% opacity
 
   // ── Backgrounds ────────────────────────────────────────

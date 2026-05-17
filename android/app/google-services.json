@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "11097370396",
+    "project_id": "movecar-65d1e",
+    "storage_bucket": "movecar-65d1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:11097370396:android:d63f3831bf8066d27654d9",
+        "android_client_info": {
+          "package_name": "com.example.convoyeur_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWKfrFahqbbHIPJaxWB-oYRZnc7zDk_DA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
