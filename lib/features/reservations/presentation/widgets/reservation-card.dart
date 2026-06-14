@@ -192,11 +192,17 @@ class _ReservationCardState extends State<ReservationCard>
     );
   }
 
- // APRÈS
-// APRÈS
-void _handleLaunchMission() {
-  context.go('/pretrip-inspection/${widget.reservation.id}');
-}
+  void _handleLaunchMission() {
+    final mission = widget.reservation.mission;
+    context.go(
+      '/mission_session/${widget.reservation.id}',
+      extra: {
+        'latitudeArrivee': mission?.latitudeArrivee,
+        'longitudeArrivee': mission?.longitudeArrivee,
+        'villeArrivee': mission?.villeArrivee,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

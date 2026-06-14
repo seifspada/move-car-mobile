@@ -278,7 +278,7 @@ class _SearchFilterModalState extends ConsumerState<SearchFilterModal> {
                               const SizedBox(height: 3),
                               Text(
                                 'Notification pour '
-                                '${depart!.name} → ${arrivee!.name}',
+                                '${depart.name} → ${arrivee.name}',
                                 style: const TextStyle(
                                     color: _textMuted, fontSize: 11),
                               ),

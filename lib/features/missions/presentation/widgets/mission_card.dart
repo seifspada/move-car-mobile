@@ -5,12 +5,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+// ✅ Callback vers le parent pour synchroniser le Set des favoris
+typedef FavoriteToggleCallback = void Function(String missionId, bool newValue);
+
 class MissionCard extends ConsumerStatefulWidget {
   final MissionModel mission;
   final VoidCallback? onTap;
 
-  const MissionCard({Key? key, required this.mission, this.onTap})
-      : super(key: key);
+  // ✅ Nouveaux props : état contrôlé par MissionList
+  final bool? isFavoriOverride;
+  final FavoriteToggleCallback? onFavoriteToggle;
+
+  const MissionCard({
+    super.key,
+    required this.mission,
+    this.onTap,
+    this.isFavoriOverride,
+    this.onFavoriteToggle,
+  });
 
   @override
   ConsumerState<MissionCard> createState() => _MissionCardState();
@@ -18,12 +30,18 @@ class MissionCard extends ConsumerStatefulWidget {
 
 class _MissionCardState extends ConsumerState<MissionCard>
     with SingleTickerProviderStateMixin {
-  bool _isFavorite = false;
+  // ✅ State local uniquement si usage standalone (sans parent qui contrôle)
+  bool _localFavorite = false;
   late AnimationController _hoverController;
+
+  bool get _isControlled => widget.isFavoriOverride != null;
+  bool get _isFavorite =>
+      _isControlled ? widget.isFavoriOverride! : _localFavorite;
 
   @override
   void initState() {
     super.initState();
+    _localFavorite = widget.mission.isFavori ?? false;
     _hoverController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -36,7 +54,17 @@ class _MissionCardState extends ConsumerState<MissionCard>
     super.dispose();
   }
 
-  /// Corrige les chaînes avec encodage Latin-1 corrompu + fallback vide
+  // ✅ Toggle : notifie le parent en priorité (optimistic), sinon state local
+  void _handleFavoriteTap() {
+    final newValue = !_isFavorite;
+    if (_isControlled) {
+      widget.onFavoriteToggle?.call(widget.mission.id, newValue);
+    } else {
+      setState(() => _localFavorite = newValue);
+    }
+    // TODO: appel API GraphQL toggleFavori ici si besoin
+  }
+
   String _decode(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
     return raw
@@ -76,7 +104,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
                     : const EdgeInsets.fromLTRB(24, 52, 24, 18);
 
                 return Container(
-                  // FIX: clipBehavior empêche tout débordement visible
                   clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
                     color: const Color(0xFF111217),
@@ -108,11 +135,7 @@ class _MissionCardState extends ConsumerState<MissionCard>
                       ),
                       Padding(
                         padding: padding,
-                        child: _buildContent(
-                          vehicleConfig,
-                          fuelConfig,
-                          isCompact,
-                        ),
+                        child: _buildContent(vehicleConfig, fuelConfig, isCompact),
                       ),
                     ],
                   ),
@@ -163,10 +186,7 @@ class _MissionCardState extends ConsumerState<MissionCard>
     );
   }
 
-  Widget _buildTopSection(
-    Map<String, dynamic> vehicleConfig,
-    bool isCompact,
-  ) {
+  Widget _buildTopSection(Map<String, dynamic> vehicleConfig, bool isCompact) {
     final iconSize = isCompact ? 48.0 : 72.0;
     final favoriteButtonSize = isCompact ? 34.0 : 42.0;
 
@@ -174,7 +194,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Ligne 1 : icône véhicule (gauche) + étoile (droite)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -215,7 +234,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
           ],
         ),
         SizedBox(height: isCompact ? 4 : 6),
-        // Ligne 2 : villes sur toute la largeur
         _buildRoute(isCompact),
       ],
     );
@@ -224,12 +242,10 @@ class _MissionCardState extends ConsumerState<MissionCard>
   Widget _buildRoute(bool isCompact) {
     final depart = _decode(widget.mission.villeDepart);
     final arrivee = _decode(widget.mission.villeArrivee);
-
     final departDisplay = depart.isNotEmpty ? depart : '—';
     final arriveeDisplay = arrivee.isNotEmpty ? arrivee : '—';
     final fontSize = isCompact ? 16.0 : 22.0;
 
-    // Pleine largeur garantie par le parent Column(stretch)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -273,9 +289,10 @@ class _MissionCardState extends ConsumerState<MissionCard>
     );
   }
 
+  // ✅ Bouton favori — lit _isFavorite (contrôlé ou local)
   Widget _buildFavoriteButton(bool isCompact) {
     return GestureDetector(
-      onTap: () => setState(() => _isFavorite = !_isFavorite),
+      onTap: _handleFavoriteTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: isCompact ? 34 : 42,
@@ -294,8 +311,7 @@ class _MissionCardState extends ConsumerState<MissionCard>
         ),
         child: Icon(
           _isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
-          color:
-              _isFavorite ? AppColors.primaryLight : const Color(0xFF9CA3AF),
+          color: _isFavorite ? AppColors.primaryLight : const Color(0xFF9CA3AF),
           size: isCompact ? 18 : 22,
         ),
       ),
@@ -333,9 +349,7 @@ class _MissionCardState extends ConsumerState<MissionCard>
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon,
-                    color: const Color(0xFF9CA3AF),
-                    size: isCompact ? 13 : 16),
+                Icon(icon, color: const Color(0xFF9CA3AF), size: isCompact ? 13 : 16),
                 SizedBox(width: isCompact ? 3 : 6),
               ],
               Text(
@@ -350,24 +364,21 @@ class _MissionCardState extends ConsumerState<MissionCard>
           ),
           SizedBox(height: isCompact ? 2 : 4),
           LayoutBuilder(
-            builder: (context, constraints) {
-              return SizedBox(
-                width: constraints.maxWidth,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      color:
-                          isPrimary ? AppColors.primaryLight : Colors.white,
-                      fontSize: isCompact ? 17 : 24,
-                      fontWeight: FontWeight.w900,
-                    ),
-                    maxLines: 1,
+            builder: (context, constraints) => SizedBox(
+              width: constraints.maxWidth,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    color: isPrimary ? AppColors.primaryLight : Colors.white,
+                    fontSize: isCompact ? 17 : 24,
+                    fontWeight: FontWeight.w900,
                   ),
+                  maxLines: 1,
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -379,7 +390,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
     Map<String, dynamic> fuelConfig,
     bool isCompact,
   ) {
-    // FIX: decode les labels
     final fuelLabel = _decode(fuelConfig['label'] as String?);
     final vehicleLabel = _decode(vehicleConfig['label'] as String?);
 
@@ -413,7 +423,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
                   icon: Icons.local_gas_station_rounded,
                   iconColor: AppColors.primaryLight,
                   isCompact: true,
-                  // FIX: FittedBox évite le word-wrap sur "Essence"
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -494,7 +503,6 @@ class _MissionCardState extends ConsumerState<MissionCard>
       );
     }
 
-    // Mode normal (non compact)
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -627,18 +635,14 @@ class _MissionCardState extends ConsumerState<MissionCard>
     );
   }
 
-  String _formatPrice(double value) {
-    return '${value.toStringAsFixed(2)}€';
-  }
+  String _formatPrice(double value) => '${value.toStringAsFixed(2)}€';
 
   String _formatDateRange() {
     final start = widget.mission.dateDebut;
     if (start == null) return 'N/A';
-
     final formatter = DateFormat('dd/MM');
     final startDate = formatter.format(start);
     final end = widget.mission.dateDepartMax;
-
     if (end == null) return startDate;
     return '$startDate\n${formatter.format(end)}';
   }

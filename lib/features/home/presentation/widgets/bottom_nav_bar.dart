@@ -1,5 +1,6 @@
 // lib/features/home/presentation/widgets/bottom_nav_bar.dart
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:convoyeur_mobile/app/theme/app_colors.dart';
@@ -10,43 +11,59 @@ class BottomNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentIndex = ref.watch(navIndexProvider);
+    final currentIndex  = ref.watch(navIndexProvider);
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     final items = [
-      _NavItem(icon: Icons.home_outlined,           activeIcon: Icons.home_rounded,          label: 'Accueil'),
-      _NavItem(icon: Icons.directions_car_outlined,  activeIcon: Icons.directions_car_rounded, label: 'Missions'),
-      _NavItem(icon: Icons.bookmark_outline,         activeIcon: Icons.bookmark_rounded,       label: 'Réservations'),
-      _NavItem(icon: Icons.person_outline,           activeIcon: Icons.person_rounded,         label: 'Profil'),
+      _NavItem(icon: Icons.dashboard_customize_outlined, activeIcon: Icons.dashboard_customize_rounded, label: 'Accueil'),
+      _NavItem(icon: Icons.route_outlined,               activeIcon: Icons.route_rounded,               label: 'Missions'),
+      _NavItem(icon: Icons.edit_calendar_outlined,       activeIcon: Icons.edit_calendar_rounded,       label: 'Réservations'),
+      _NavItem(icon: Icons.person_pin_outlined,          activeIcon: Icons.person_pin_rounded,          label: 'Profil'),
     ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(items.length, (index) {
-              return _NavBarItem(
-                item: items[index],
-                isSelected: currentIndex == index,
-                onTap: () =>
-                    ref.read(navIndexProvider.notifier).state = index,
-              );
-            }),
+    return Padding(
+      // Seul padding : marges latérales + safe area bottom
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding > 0 ? bottomPadding + 4 : 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 62,
+            decoration: BoxDecoration(
+              // La pill elle-même — opacité un peu plus haute pour qu'elle soit
+              // lisible sans rectangle porteur derrière
+              color: AppColors.surface.withOpacity(0.88),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.09),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
+                  spreadRadius: -4,
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(items.length, (index) {
+                  return Expanded(
+                    child: _NavBarItem(
+                      item: items[index],
+                      isSelected: currentIndex == index,
+                      onTap: () =>
+                          ref.read(navIndexProvider.notifier).state = index,
+                    ),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),
@@ -59,15 +76,11 @@ class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
+  const _NavItem({required this.icon, required this.activeIcon, required this.label});
 }
 
-// ── Item animé ─────────────────────────────────────────────
-class _NavBarItem extends StatefulWidget {
+// ── Item avec indicateur d'arrière-plan fluide ─────────────
+class _NavBarItem extends StatelessWidget {
   final _NavItem item;
   final bool isSelected;
   final VoidCallback onTap;
@@ -79,144 +92,44 @@ class _NavBarItem extends StatefulWidget {
   });
 
   @override
-  State<_NavBarItem> createState() => _NavBarItemState();
-}
-
-class _NavBarItemState extends State<_NavBarItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scaleAnim;
-  late final Animation<double> _pillWidth;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    _scaleAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
-
-    _pillWidth = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
-
-    if (widget.isSelected) _ctrl.value = 1.0;
-  }
-
-  @override
-  void didUpdateWidget(_NavBarItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isSelected && !oldWidget.isSelected) {
-      _ctrl.forward(from: 0);
-    } else if (!widget.isSelected && oldWidget.isSelected) {
-      _ctrl.reverse();
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (context, _) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Pill + icône ──────────────────────────
-              ScaleTransition(
-                scale: _scaleAnim,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.isSelected ? 18 : 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.isSelected
-                        ? AppColors.primary.withValues(alpha: 0.15)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                    border: widget.isSelected
-                        ? Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            width: 1,
-                          )
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        widget.isSelected
-                            ? widget.item.activeIcon
-                            : widget.item.icon,
-                        color: widget.isSelected
-                            ? AppColors.primary
-                            : AppColors.textHint,
-                        size: 22,
-                      ),
-                      // Label qui s'étend quand sélectionné
-                      ClipRect(
-                        child: AnimatedSize(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
-                          child: widget.isSelected
-                              ? Padding(
-                                  padding: const EdgeInsets.only(left: 6),
-                                  child: Text(
-                                    widget.item.label,
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOutCubic,
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(34),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: isSelected ? 1.1 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                isSelected ? item.activeIcon : item.icon,
+                color: isSelected ? Colors.white : AppColors.textHint,
+                size: 22,
               ),
-
-              // ── Dot indicator ─────────────────────────
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.only(top: 4),
-                width: widget.isSelected ? 4 : 0,
-                height: widget.isSelected ? 4 : 0,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: widget.isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : [],
-                ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textHint,
+                fontSize: 11,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: 0.2,
               ),
-            ],
-          );
-        },
+              child: Text(item.label),
+            ),
+          ],
+        ),
       ),
     );
   }

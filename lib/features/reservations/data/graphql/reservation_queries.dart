@@ -1,7 +1,7 @@
 // lib/features/reservations/data/graphql/reservation_queries.dart
 
 // ── Queries ────────────────────────────────────────────────
-
+/*
 const String getMyReservations = '''
   query GetMyReservations {
     myReservations {
@@ -45,12 +45,14 @@ const String getMyReservations = '''
         }
         adresseArrivee {
           villeNom
+          latitude
+          longitude
         }
       }
     }
   }
 ''';
-
+*/
 const String getAllReservations = '''
   query GetAllReservations {
     allReservations {
@@ -94,6 +96,8 @@ const String getAllReservations = '''
         }
         adresseArrivee {
           villeNom
+          latitude
+          longitude
         }
       }
     }
@@ -143,6 +147,8 @@ const String getReservationById = '''
         }
         adresseArrivee {
           villeNom
+          latitude
+          longitude
         }
       }
     }
@@ -192,6 +198,8 @@ const String getReservationsByMission = '''
         }
         adresseArrivee {
           villeNom
+          latitude
+          longitude
         }
       }
     }
@@ -301,6 +309,98 @@ const String refuseCancellationRequest = '''
       statut
       statutPrecedent
       motifRefus
+    }
+  }
+''';
+
+
+const String getMissionSessionsByStatutQuery = '''
+  query GetMyMissionSessions(\$statut: String) {
+    getMyMissionSessions(statut: \$statut) {
+      id
+      statut
+      dateDebut
+      dateFin
+      missionId
+      reservationId
+      reservation {
+        id
+        numeroReservation
+        dateDepart
+        heureDepart
+        heureArrivee
+        montantTotal
+        distanceKm
+        mission {
+          id
+          adresseDepart {
+            villeNom
+          }
+          adresseArrivee {
+            villeNom
+          }
+        }
+      }
+    }
+  }
+''';
+
+
+// lib/features/reservations/data/graphql/reservation_queries.dart
+
+const String getMyReservations = '''
+  query GetMyReservations {
+    myReservations {
+      id
+      missionId
+      numeroReservation
+      statut
+      statutPrecedent
+      dateDepart
+      heureDepart
+      dateArrivee
+      heureArrivee
+      dureeEstimee
+      montantTotal
+      fraisPeage
+      distanceKm
+      motifRefus
+      motifAnnulation
+      annulePar
+      dateCreation
+      dateAcceptationAgent
+      dateConfirmationAdherent
+      dateAnnulation
+      adherent {
+        id
+        nom
+        prenom
+        telephone
+        statut
+        user {
+          name
+          email
+          photo
+        }
+      }
+      mission {
+        id
+        statut
+        adresseDepart {
+          villeNom
+        }
+        adresseArrivee {
+          villeNom
+          latitude
+          longitude
+        }
+      }
+      missionSession {
+        id
+        statut
+        dateDebut
+        dateFin
+      }
     }
   }
 ''';

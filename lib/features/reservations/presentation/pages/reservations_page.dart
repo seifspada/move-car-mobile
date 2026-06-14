@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:convoyeur_mobile/app/theme/app_colors.dart';
 import '../../domain/entities/reservation_entity.dart';
-// ✅ Doit pointer vers le bon provider
 
 
 class _Filter {
@@ -23,6 +22,11 @@ const _filters = [
   _Filter('ANNULATION_DEMANDEE',   'Annul. en cours'),
   _Filter('REFUSEE',               'Refusées'),
   _Filter('ANNULEE',               'Annulées'),
+];
+
+const _confirmedSubFilters = [
+  _Filter('CONFIRMED_BY_ADHERENT', 'Confirmées'),
+  _Filter('EN_COURS',              'En cours'),
   _Filter('TERMINEE',              'Terminées'),
 ];
 
@@ -36,6 +40,7 @@ class ReservationsPage extends ConsumerStatefulWidget {
 class _ReservationsPageState extends ConsumerState<ReservationsPage>
     with SingleTickerProviderStateMixin {
   String _activeFilter = 'ALL';
+  String _activeSubFilter = _confirmedSubFilters.first.value;
 
   late final AnimationController _headerCtrl;
   late final Animation<Offset>   _headerSlide;
@@ -44,7 +49,6 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage>
   @override
   void initState() {
     super.initState();
-
     _headerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -55,8 +59,6 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage>
     ).animate(CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut));
     _headerFade = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
 
-    // ✅ Déclencher le fetch ici — le token est déjà disponible
-    // car on arrive sur cette page APRÈS le login réussi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(reservationProvider.notifier).fetchMyReservations();
     });
@@ -68,9 +70,59 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage>
     super.dispose();
   }
 
+  void _selectFilter(String value) {
+    setState(() {
+      _activeFilter = value;
+      if (value == 'CONFIRMED_BY_ADHERENT') {
+        _activeSubFilter = _confirmedSubFilters.first.value;
+      }
+    });
+  }
+
+  // ── Filtrage corrigé ─────────────────────────────────────
   List<ReservationEntity> _filtered(List<ReservationEntity> all) {
     if (_activeFilter == 'ALL') return all;
+
+    if (_activeFilter == 'CONFIRMED_BY_ADHERENT') {
+      switch (_activeSubFilter) {
+        case 'EN_COURS':
+          return all
+              .where((r) => r.missionSession?.statut == 'EN_COURS')
+              .toList();
+        case 'TERMINEE':
+          return all
+              .where((r) => r.missionSession?.statut == 'TERMINEE')
+              .toList();
+        default: // 'CONFIRMED_BY_ADHERENT'
+          return all
+              .where((r) =>
+                  r.statut == 'CONFIRMED_BY_ADHERENT' &&
+                  r.missionSession == null)
+              .toList();
+      }
+    }
+
     return all.where((r) => r.statut == _activeFilter).toList();
+  }
+
+  // ── Comptage corrigé ─────────────────────────────────────
+  int _countSubFilter(List<ReservationEntity> all, String subFilter) {
+    switch (subFilter) {
+      case 'EN_COURS':
+        return all
+            .where((r) => r.missionSession?.statut == 'EN_COURS')
+            .length;
+      case 'TERMINEE':
+        return all
+            .where((r) => r.missionSession?.statut == 'TERMINEE')
+            .length;
+      default:
+        return all
+            .where((r) =>
+                r.statut == 'CONFIRMED_BY_ADHERENT' &&
+                r.missionSession == null)
+            .length;
+    }
   }
 
   int _countByStatut(List<ReservationEntity> all, String statut) =>
@@ -117,9 +169,7 @@ class _ReservationsPageState extends ConsumerState<ReservationsPage>
     final reservations = state.reservations;
     final filtered     = _filtered(reservations);
     final nbAConfirmer = _countByStatut(reservations, 'ACCEPTED_BY_AGENT');
-debugPrint('🔍 state.reservations.length = ${state.reservations.length}');
-debugPrint('🔍 state.isLoading = ${state.isLoading}');
-debugPrint('🔍 state.errorMessage = ${state.errorMessage}');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -147,8 +197,20 @@ debugPrint('🔍 state.errorMessage = ${state.errorMessage}');
                                 ),
                               ),
                             SliverToBoxAdapter(child: _buildFilters(reservations)),
+
+                            if (_activeFilter == 'CONFIRMED_BY_ADHERENT')
+                              SliverToBoxAdapter(
+                                child: _buildSubFilters(reservations),
+                              ),
+
                             if (filtered.isEmpty)
-                              SliverFillRemaining(child: _EmptyState(filter: _activeFilter))
+                              SliverFillRemaining(
+                                child: _EmptyState(
+                                  filter: _activeFilter == 'CONFIRMED_BY_ADHERENT'
+                                      ? _activeSubFilter
+                                      : _activeFilter,
+                                ),
+                              )
                             else
                               SliverPadding(
                                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -257,16 +319,28 @@ debugPrint('🔍 state.errorMessage = ${state.errorMessage}');
     );
   }
 
+  // ── Filtres principaux ────────────────────────────────────
   Widget _buildFilters(List<ReservationEntity> all) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Row(
         children: _filters.map((f) {
-          final count   = f.value == 'ALL' ? all.length : all.where((r) => r.statut == f.value).length;
+          // ✅ Comptage corrigé pour "Confirmées"
+          final count = f.value == 'ALL'
+              ? all.length
+              : f.value == 'CONFIRMED_BY_ADHERENT'
+                  ? all
+                      .where((r) =>
+                          r.statut == 'CONFIRMED_BY_ADHERENT' ||
+                          r.missionSession?.statut == 'EN_COURS' ||
+                          r.missionSession?.statut == 'TERMINEE')
+                      .length
+                  : all.where((r) => r.statut == f.value).length;
+
           final isActive = _activeFilter == f.value;
           return GestureDetector(
-            onTap: () => setState(() => _activeFilter = f.value),
+            onTap: () => _selectFilter(f.value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(right: 8),
@@ -282,6 +356,62 @@ debugPrint('🔍 state.errorMessage = ${state.errorMessage}');
                   color: isActive ? Colors.white : AppColors.textHint,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Sous-filtres "Confirmées" corrigés ────────────────────
+  Widget _buildSubFilters(List<ReservationEntity> all) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: _confirmedSubFilters.map((sf) {
+          // ✅ Comptage corrigé par missionSession.statut
+          final count    = _countSubFilter(all, sf.value);
+          final isActive = _activeSubFilter == sf.value;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeSubFilter = sf.value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      sf.label,
+                      style: TextStyle(
+                        color: isActive ? Colors.white : AppColors.textHint,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        color: isActive
+                            ? Colors.white.withOpacity(0.85)
+                            : AppColors.textHint.withOpacity(0.7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -439,6 +569,32 @@ class _EmptyState extends StatelessWidget {
   final String filter;
   const _EmptyState({required this.filter});
 
+  String get _message {
+    switch (filter) {
+      case 'ALL':
+        return "Vous n'avez pas encore effectué de réservation.";
+      case 'CONFIRMED_BY_ADHERENT':
+        return "Aucune réservation confirmée pour le moment.";
+      case 'EN_COURS':
+        return "Aucune mission en cours d'exécution.";
+      case 'TERMINEE':
+        return "Aucune mission terminée pour le moment.";
+      default:
+        return "Aucune réservation avec ce statut.";
+    }
+  }
+
+  IconData get _icon {
+    switch (filter) {
+      case 'EN_COURS':
+        return Icons.route_outlined;
+      case 'TERMINEE':
+        return Icons.flag_outlined;
+      default:
+        return Icons.description_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -448,16 +604,14 @@ class _EmptyState extends StatelessWidget {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(color: AppColors.surfaceElevated, shape: BoxShape.circle),
-            child: const Icon(Icons.description_outlined, color: AppColors.textHint, size: 32),
+            child: Icon(_icon, color: AppColors.textHint, size: 32),
           ),
           const SizedBox(height: 16),
           const Text('Aucune réservation',
               style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           Text(
-            filter == 'ALL'
-                ? "Vous n'avez pas encore effectué de réservation."
-                : 'Aucune réservation avec ce statut.',
+            _message,
             style: const TextStyle(color: AppColors.textHint, fontSize: 13),
             textAlign: TextAlign.center,
           ),

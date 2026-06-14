@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error/failures.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
 
@@ -12,12 +13,14 @@ class AuthState {
   final bool isLoading;
   final String? errorMessage;
   final bool isAuthenticated;
+  final bool isInitialized;
 
   const AuthState({
     this.user,
     this.isLoading = false,
     this.errorMessage,
     this.isAuthenticated = false,
+    this.isInitialized = false,
   });
 
   AuthState copyWith({
@@ -25,12 +28,14 @@ class AuthState {
     bool? isLoading,
     String? errorMessage,
     bool? isAuthenticated,
+    bool? isInitialized,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }
@@ -38,13 +43,39 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final LoginUseCase _loginUseCase;
   final LogoutUseCase _logoutUseCase;
+  final AuthRepository _repository;
 
   AuthNotifier({
     required LoginUseCase loginUseCase,
     required LogoutUseCase logoutUseCase,
+    required AuthRepository repository,
   })  : _loginUseCase = loginUseCase,
         _logoutUseCase = logoutUseCase,
-        super(const AuthState());
+        _repository = repository,
+        super(const AuthState(isLoading: true)) {
+    checkAuthStatus();
+  }
+
+  Future<void> checkAuthStatus() async {
+    final hasToken = await _repository.isAuthenticated();
+    if (!hasToken) {
+      state = const AuthState(isInitialized: true);
+      return;
+    }
+
+    final result = await _repository.getCurrentUser();
+    result.fold(
+      (_) => state = const AuthState(
+        isAuthenticated: true,
+        isInitialized: true,
+      ),
+      (user) => state = AuthState(
+        user: user,
+        isAuthenticated: true,
+        isInitialized: true,
+      ),
+    );
+  }
 
   Future<void> login({
     required String email,
@@ -66,6 +97,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         user: user,
         isAuthenticated: true,
+        isInitialized: true,
       ),
     );
   }
@@ -98,8 +130,10 @@ final logoutUseCaseProvider = Provider((ref) {
 });
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final repository = ref.read(authRepositoryProvider);
   return AuthNotifier(
     loginUseCase: ref.read(loginUseCaseProvider),
     logoutUseCase: ref.read(logoutUseCaseProvider),
+    repository: repository,
   );
 });

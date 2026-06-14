@@ -12,26 +12,30 @@ class AuthInterceptor extends Interceptor {
 
   AuthInterceptor(this.ref);
 
-  @override
-  void onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) async {
-    // Ne pas ajouter le token sur les routes d'auth
-    final isAuthRoute =
-        options.path.contains('/auth/login') ||
-        options.path.contains('/auth/register');
-
-    if (!isAuthRoute) {
-      final token = await _readToken();
-      if (token != null && token.isNotEmpty) {
-        options.headers['Authorization'] = 'Bearer $token';
-      }
-    }
-
-    handler.next(options);
+@override
+void onRequest(
+  RequestOptions options,
+  RequestInterceptorHandler handler,
+) async {
+  // ✅ Ajoute Content-Type json seulement si ce n'est pas un upload multipart
+  final isMultipart = options.data is FormData;
+  if (!isMultipart) {
+    options.headers['Content-Type'] = 'application/json';
   }
 
+  final isAuthRoute =
+      options.path.contains('/auth/login') ||
+      options.path.contains('/auth/register');
+
+  if (!isAuthRoute) {
+    final token = await _readToken();
+    if (token != null && token.isNotEmpty) {
+      options.headers['Authorization'] = 'Bearer ${token.trim()}';
+    }
+  }
+
+  handler.next(options);
+}
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {

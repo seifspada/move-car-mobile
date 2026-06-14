@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:convoyeur_mobile/app/theme/app_colors.dart';
 import '../../../missions/data/models/mission_model.dart';
 import '../../../missions/presentation/providers/mission_providers.dart';
 

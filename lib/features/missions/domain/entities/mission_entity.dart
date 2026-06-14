@@ -494,3 +494,178 @@ class SearchTrajetFilterEntity extends Equatable {
   String toString() =>
     'SearchTrajetFilterEntity($villeDepartNom → $villeArriveeNom, rayon: $rayon)';
 }
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AJOUT à votre fichier existant :
+// lib/features/missions/domain/entities/mission_entity.dart
+//
+// Copiez ces classes à la fin de votre fichier existant.
+// ──────────────────────────────────────────────────────────────────────────────
+
+class Partenaire {
+  final int id;
+  final String nom;
+  final String prenom;
+  final String entiteGroupe;
+  final String? entiteAgence;
+  final String email;
+  final String telephone;
+  final String? logo;
+
+  const Partenaire({
+    required this.id,
+    required this.nom,
+    required this.prenom,
+    required this.entiteGroupe,
+    this.entiteAgence,
+    required this.email,
+    required this.telephone,
+    this.logo,
+  });
+}
+
+class Adresse {
+  final String villeNom;
+  final String adresseComplete;
+  final String typeLieu;
+  final String? nomLieu;
+  final double? latitude;
+  final double? longitude;
+
+  const Adresse({
+    required this.villeNom,
+    required this.adresseComplete,
+    required this.typeLieu,
+    this.nomLieu,
+    this.latitude,
+    this.longitude,
+  });
+}
+
+class Vehicule {
+  final String marqueModele;
+  final String immatriculation;
+  final String typeVehicule;
+  final String typeCarburant;
+  final int nombrePlaces;
+  final String? boiteVitesse;
+
+  const Vehicule({
+    required this.marqueModele,
+    required this.immatriculation,
+    required this.typeVehicule,
+    required this.typeCarburant,
+    required this.nombrePlaces,
+    this.boiteVitesse,
+  });
+}
+
+class Disponibilite {
+  final String dateDebut;
+  final String dateFin;
+  final String? dateDepartMax;
+
+  const Disponibilite({
+    required this.dateDebut,
+    required this.dateFin,
+    this.dateDepartMax,
+  });
+}
+
+class Calcul {
+  final double distanceKm;
+  final double montantTotal;
+  final double fraisPeage;
+
+  const Calcul({
+    required this.distanceKm,
+    required this.montantTotal,
+    required this.fraisPeage,
+  });
+}
+
+
+// domain/entities/mission_entity.dart
+
+class Agent {
+  final String id;
+  final String nom;
+  final String prenom;
+  final String email;
+  final String? telephone;
+  final String? photo;
+
+  const Agent({
+    required this.id,
+    required this.nom,
+    required this.prenom,
+    required this.email,
+    this.telephone,
+    this.photo,
+  });
+}
+
+class Notification {
+  final String id;
+  final String typeNotification;
+  final bool actif;
+  final String nomContact;
+  final String telephoneContact;
+
+  const Notification({
+    required this.id,
+    required this.typeNotification,
+    required this.actif,
+    required this.nomContact,
+    required this.telephoneContact,
+  });
+}
+
+class Contrat {
+  final double prixParKm;
+  final double depassementKilometrage;
+  final double retardSansAvertissement;
+  final double restitutionAutreEndroit;
+
+  const Contrat({
+    required this.prixParKm,
+    required this.depassementKilometrage,
+    required this.retardSansAvertissement,
+    required this.restitutionAutreEndroit,
+  });
+}
+
+class MissionDetail {
+  final String id;
+  final String statut;
+  final String? commentaire;
+  final String dateCreation;
+  final Partenaire? partenaire;
+  final Agent? agent;           // ← AJOUT
+  final Vehicule? vehicule;
+  final Adresse? adresseDepart;
+  final Adresse? adresseArrivee;
+  final Disponibilite? disponibilite;
+  final Calcul? calculs;
+  final List<Notification> notifications; // ← AJOUT
+  final Contrat? contrat;                 // ← AJOUT
+  final bool isFavori;
+
+  const MissionDetail({
+    required this.id,
+    required this.statut,
+    this.commentaire,
+    required this.dateCreation,
+    this.partenaire,
+    this.agent,
+    this.vehicule,
+    this.adresseDepart,
+    this.adresseArrivee,
+    this.disponibilite,
+    this.calculs,
+    this.notifications = const [],
+    this.contrat,
+    required this.isFavori,
+  });
+}

@@ -16,7 +16,7 @@ final dioProvider = Provider<Dio>((ref) {
       // ⚠️ sendTimeout non supporté sur Flutter Web → null sur web
       sendTimeout: kIsWeb ? null : const Duration(seconds: 90),
       headers: {
-        'Content-Type': 'application/json',
+       // 'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     ),

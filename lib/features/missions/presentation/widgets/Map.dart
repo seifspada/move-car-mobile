@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 // ─────────────────────────────────────────────
-// Data model — équivalent de MapPoint (TS)
+// Data model
 // ─────────────────────────────────────────────
 class MapPoint {
   final LatLng position;
@@ -14,7 +14,7 @@ class MapPoint {
   const MapPoint({
     required this.position,
     required this.radius,
-    this.color = const Color(0xFFF97316), // orange par défaut
+    this.color = const Color(0xFFF97316),
     this.label,
   });
 }
@@ -23,16 +23,9 @@ class MapPoint {
 // MapComponent — widget principal
 // ─────────────────────────────────────────────
 class MapComponent extends StatefulWidget {
-  /// Centre initial de la carte (optionnel).
   final LatLng? center;
-
-  /// Rayon du cercle autour du centre (si points est null).
   final double? radius;
-
-  /// Niveau de zoom initial.
   final double zoom;
-
-  /// Liste de points à afficher (prioritaire sur center+radius).
   final List<MapPoint>? points;
 
   const MapComponent({
@@ -56,7 +49,6 @@ class _MapComponentState extends State<MapComponent> {
     _mapController = MapController();
   }
 
-  // Calcule la liste effective de MapPoint (même logique que le composant React)
   List<MapPoint> get _resolvedPoints {
     if (widget.points != null && widget.points!.isNotEmpty) {
       return widget.points!;
@@ -73,23 +65,23 @@ class _MapComponentState extends State<MapComponent> {
     return [];
   }
 
+  // ✅ FIX 3 — Centre Tunisie par défaut
   LatLng get _initialCenter =>
-      widget.center ?? const LatLng(46.603354, 1.888334); // France par défaut
+      widget.center ?? const LatLng(33.8869, 9.5375);
 
   @override
   void didUpdateWidget(MapComponent oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Reproduit le comportement flyTo quand center / zoom change
     if (widget.center != null &&
         (widget.center != oldWidget.center || widget.zoom != oldWidget.zoom)) {
       _mapController.move(widget.center!, widget.zoom);
     }
 
-    // Reproduit le fitBounds quand plusieurs points sont fournis
     final pts = _resolvedPoints;
     if (pts.length > 1) {
-      final bounds = LatLngBounds.fromPoints(pts.map((p) => p.position).toList());
+      final bounds =
+          LatLngBounds.fromPoints(pts.map((p) => p.position).toList());
       _mapController.fitCamera(
         CameraFit.bounds(
           bounds: bounds,
@@ -99,14 +91,12 @@ class _MapComponentState extends State<MapComponent> {
     }
   }
 
-  // Icône bleue (départ) — équivalent customIcon
   Widget _defaultMarker() => const Icon(
         Icons.location_on,
         color: Color(0xFF2A81CB),
         size: 36,
       );
 
-  // Icône verte (arrivée) — équivalent arrivalIcon
   Widget _arrivalMarker() => const Icon(
         Icons.location_on,
         color: Color(0xFF2AAD27),
@@ -124,26 +114,22 @@ class _MapComponentState extends State<MapComponent> {
         initialZoom: widget.zoom,
       ),
       children: [
-        // ── Tuile OpenStreetMap ──────────────────────────────────────
+        // ✅ FIX 1 — userAgentPackageName correct
+        // ✅ FIX 2 — additionalOptions supprimé (API obsolète)
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.app',
-          // Attribution affichée en bas de carte
-          additionalOptions: const {
-            'attribution':
-                '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          },
+          userAgentPackageName: 'com.movecar.app',
         ),
 
-        // ── Cercles ──────────────────────────────────────────────────
         CircleLayer(
           circles: mapPoints
               .map(
                 (point) => CircleMarker(
                   point: point.position,
                   radius: point.radius,
-                  useRadiusInMeter: true, // rayon en mètres (comme Leaflet)
-                  color: point.color.withOpacity(0.15),
+                  useRadiusInMeter: true,
+                  // ✅ FIX 4 — withOpacity → withValues
+                  color: point.color.withValues(alpha: 0.15),
                   borderColor: point.color,
                   borderStrokeWidth: 1.5,
                 ),
@@ -151,7 +137,6 @@ class _MapComponentState extends State<MapComponent> {
               .toList(),
         ),
 
-        // ── Marqueurs ────────────────────────────────────────────────
         MarkerLayer(
           markers: mapPoints
               .map(
@@ -167,7 +152,6 @@ class _MapComponentState extends State<MapComponent> {
               .toList(),
         ),
 
-        // ── Attribution (bonne pratique OSM) ─────────────────────────
         const SimpleAttributionWidget(
           source: Text('© OpenStreetMap contributors'),
         ),
@@ -175,22 +159,3 @@ class _MapComponentState extends State<MapComponent> {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// Exemple d'utilisation
-// ─────────────────────────────────────────────
-//
-// // Un seul point (centre + rayon)
-// MapComponent(
-//   center: LatLng(48.8566, 2.3522),
-//   radius: 5000,
-//   zoom: 13,
-// )
-//
-// // Plusieurs points
-// MapComponent(
-//   points: [
-//     MapPoint(position: LatLng(48.8566, 2.3522), radius: 3000, label: 'départ'),
-//     MapPoint(position: LatLng(48.9000, 2.4000), radius: 2000, label: 'arrivée'),
-//   ],
-// )

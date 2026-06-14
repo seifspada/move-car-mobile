@@ -6,6 +6,7 @@ import 'package:convoyeur_mobile/app/theme/app_colors.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../missions/presentation/providers/mission_providers.dart';
 import 'notification_panel.dart';
+import 'side_bar.dart';
 
 class TopBar extends ConsumerStatefulWidget {
   const TopBar({super.key});
@@ -32,7 +33,6 @@ class _TopBarState extends ConsumerState<TopBar>
       begin: const Offset(0, -0.3),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-
     _ctrl.forward();
   }
 
@@ -43,9 +43,9 @@ class _TopBarState extends ConsumerState<TopBar>
   }
 
   @override
-  Widget build(BuildContext context, ) {
-final authState = ref.watch(authProvider);
-final user = authState.isAuthenticated ? authState.user : null;
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.isAuthenticated ? authState.user : null;
 
     return FadeTransition(
       opacity: _fadeIn,
@@ -67,15 +67,33 @@ final user = authState.isAuthenticated ? authState.user : null;
             ],
           ),
           child: SafeArea(
+            // ✅ SafeArea gère la status bar
             bottom: false,
             child: Row(
               children: [
-                // ── Avatar ───────────────────────────────
+                GestureDetector(
+                  onTap: () {
+                    final isOpen = ref.read(sideBarOpenProvider);
+                    ref.read(sideBarOpenProvider.notifier).state = !isOpen;
+                  },
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Icon(
+                      Icons.menu_rounded,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 _AnimatedAvatar(avatarUrl: user?.avatar),
-
                 const SizedBox(width: 12),
-
-                // ── Nom + rôle ────────────────────────────
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -104,9 +122,9 @@ final user = authState.isAuthenticated ? authState.user : null;
                           color: AppColors.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(
-                          user?.role ?? '',
-                          style: const TextStyle(
+                        child: const Text(
+                          'Convoyeur',
+                          style: TextStyle(
                             color: AppColors.primary,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -117,9 +135,7 @@ final user = authState.isAuthenticated ? authState.user : null;
                     ],
                   ),
                 ),
-
-                // ── Notification bell ─────────────────────
-                _NotificationButton(),
+                const _NotificationButton(),
               ],
             ),
           ),
@@ -154,7 +170,7 @@ class _AnimatedAvatar extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(2.5), // ring épaisseur
+      padding: const EdgeInsets.all(2.5),
       child: Container(
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
@@ -174,19 +190,22 @@ class _AnimatedAvatar extends StatelessWidget {
   }
 
   Widget _defaultIcon() => Container(
-        color: AppColors.surfaceElevated,
-        child: const Icon(
-          Icons.person_rounded,
-          color: AppColors.textHint,
-          size: 24,
-        ),
-      );
+    color: AppColors.surfaceElevated,
+    child: const Icon(
+      Icons.person_rounded,
+      color: AppColors.textHint,
+      size: 24,
+    ),
+  );
 }
 
 // ── Bouton notification avec badge animé ───────────────────
 class _NotificationButton extends ConsumerStatefulWidget {
+  const _NotificationButton();
+
   @override
-  ConsumerState<_NotificationButton> createState() => _NotificationButtonState();
+  ConsumerState<_NotificationButton> createState() =>
+      _NotificationButtonState();
 }
 
 class _NotificationButtonState extends ConsumerState<_NotificationButton>
@@ -201,10 +220,10 @@ class _NotificationButtonState extends ConsumerState<_NotificationButton>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
-
-    _badgeScale = Tween<double>(begin: 0.85, end: 1.15).animate(
-      CurvedAnimation(parent: _badgeCtrl, curve: Curves.easeInOut),
-    );
+    _badgeScale = Tween<double>(
+      begin: 0.85,
+      end: 1.15,
+    ).animate(CurvedAnimation(parent: _badgeCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -215,11 +234,12 @@ class _NotificationButtonState extends ConsumerState<_NotificationButton>
 
   @override
   Widget build(BuildContext context) {
-    // Nombre d'alertes actives pour le badge
     final alertesAsync = ref.watch(myAlertesProvider);
-    final int badgeCount = alertesAsync.whenOrNull(
-      data: (list) => list.where((a) => a.actif).length,
-    ) ?? 0;
+    final int badgeCount =
+        alertesAsync.whenOrNull(
+          data: (list) => list.where((a) => a.actif).length,
+        ) ??
+        0;
 
     return GestureDetector(
       onTap: () => showNotificationPanel(context),
@@ -239,7 +259,6 @@ class _NotificationButtonState extends ConsumerState<_NotificationButton>
               color: AppColors.textSecondary,
               size: 22,
             ),
-            // Badge pulsant — visible seulement s'il y a des alertes actives
             if (badgeCount > 0)
               Positioned(
                 top: 6,
@@ -247,7 +266,10 @@ class _NotificationButtonState extends ConsumerState<_NotificationButton>
                 child: ScaleTransition(
                   scale: _badgeScale,
                   child: Container(
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
                       color: AppColors.primary,

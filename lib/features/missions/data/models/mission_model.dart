@@ -2,6 +2,7 @@
 
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+import '../../domain/entities/mission_entity.dart';
 
 // ==========================================
 // 🎯 MISSION MODEL
@@ -19,6 +20,7 @@ class MissionModel {
   final double montantTotal;
   final DateTime? dateDebut;
   final DateTime? dateDepartMax;
+  final bool isFavori; // ✅ Ajouté
 
   MissionModel({
     required this.id,
@@ -32,25 +34,58 @@ class MissionModel {
     required this.montantTotal,
     this.dateDebut,
     this.dateDepartMax,
+    this.isFavori = false, // ✅ false par défaut
   });
 
   factory MissionModel.fromJson(Map<String, dynamic> json) {
     return MissionModel(
-      id:            json['id']            as String? ?? '',
-      statut:        json['statut']        as String? ?? 'EN_ATTENTE',
-      typeVehicule:  json['typeVehicule']  as String? ?? 'VOITURE',
-      typeCarburant: json['typeCarburant'] as String? ?? 'ESSENCE',
-      villeDepart:   json['villeDepart']   as String? ?? 'N/A',
-      villeArrivee:  json['villeArrivee']  as String? ?? 'N/A',
+      id:            _stringFromJson(json['id']),
+      statut:        _stringFromJson(json['statut'], 'EN_ATTENTE'),
+      typeVehicule:  _stringFromJson(json['typeVehicule'], 'VOITURE'),
+      typeCarburant: _stringFromJson(json['typeCarburant'], 'ESSENCE'),
+      villeDepart:   _stringFromJson(json['villeDepart'], 'N/A'),
+      villeArrivee:  _stringFromJson(json['villeArrivee'], 'N/A'),
       distanceKm:    (json['distanceKm']   as num?)?.toDouble() ?? 0.0,
       fraisPeage:    (json['fraisPeage']   as num?)?.toDouble() ?? 0.0,
       montantTotal:  (json['montantTotal'] as num?)?.toDouble() ?? 0.0,
+      isFavori:      json['isFavori']      as bool? ?? false, // ✅
       dateDebut: json['dateDebut'] != null
-          ? DateTime.tryParse(json['dateDebut'] as String)
+          ? DateTime.tryParse(_stringFromJson(json['dateDebut']))
           : null,
       dateDepartMax: json['dateDepartMax'] != null
-          ? DateTime.tryParse(json['dateDepartMax'] as String)
+          ? DateTime.tryParse(_stringFromJson(json['dateDepartMax']))
           : null,
+    );
+  }
+
+  // ✅ copyWith pour rollback optimiste si besoin
+  MissionModel copyWith({
+    String? id,
+    String? statut,
+    String? typeVehicule,
+    String? typeCarburant,
+    String? villeDepart,
+    String? villeArrivee,
+    double? distanceKm,
+    double? fraisPeage,
+    double? montantTotal,
+    DateTime? dateDebut,
+    DateTime? dateDepartMax,
+    bool? isFavori,
+  }) {
+    return MissionModel(
+      id:            id            ?? this.id,
+      statut:        statut        ?? this.statut,
+      typeVehicule:  typeVehicule  ?? this.typeVehicule,
+      typeCarburant: typeCarburant ?? this.typeCarburant,
+      villeDepart:   villeDepart   ?? this.villeDepart,
+      villeArrivee:  villeArrivee  ?? this.villeArrivee,
+      distanceKm:    distanceKm    ?? this.distanceKm,
+      fraisPeage:    fraisPeage    ?? this.fraisPeage,
+      montantTotal:  montantTotal  ?? this.montantTotal,
+      dateDebut:     dateDebut     ?? this.dateDebut,
+      dateDepartMax: dateDepartMax ?? this.dateDepartMax,
+      isFavori:      isFavori      ?? this.isFavori,
     );
   }
 
@@ -127,7 +162,7 @@ class SelectedCityModel {
 
   factory SelectedCityModel.fromJson(Map<String, dynamic> json) {
     return SelectedCityModel(
-      name: json['name'] as String,
+      name: _stringFromJson(json['name']),
       lat:  (json['lat'] as num).toDouble(),
       lon:  (json['lon'] as num).toDouble(),
     );
@@ -239,8 +274,8 @@ class MissionAlert {
     bool? pushActif,
     bool? emailActif,
     this.fcmToken,
-    String? dateDepart,   // ✅ ajout
-    String? dateRetour,   // ✅ ajout
+    String? dateDepart,
+    String? dateRetour,
   })  : type             = 'GEOGRAPHIQUE',
         emailActif       = emailActif ?? (kIsWeb ? true : false),
         pushActif        = pushActif  ?? (kIsWeb ? false : true),
@@ -254,8 +289,8 @@ class MissionAlert {
         villeArriveeNom  = null,
         latitudeArrivee  = null,
         longitudeArrivee = null,
-        dateDepart       = dateDepart,   // ✅
-        dateRetour       = dateRetour;   // ✅
+        dateDepart       = dateDepart,
+        dateRetour       = dateRetour;
 
   MissionAlert.trajet({
     required String villeDepartNom,
@@ -292,8 +327,8 @@ class MissionAlert {
       'pushActif':  pushActif,
       'rayon':      rayon,
       if (fcmToken   != null) 'fcmToken':   fcmToken,
-      if (dateDepart != null) 'dateDepart': dateDepart,  // ✅ ajout
-      if (dateRetour != null) 'dateRetour': dateRetour,  // ✅ ajout
+      if (dateDepart != null) 'dateDepart': dateDepart,
+      if (dateRetour != null) 'dateRetour': dateRetour,
     };
 
     if (type == 'GEOGRAPHIQUE') {
@@ -318,23 +353,21 @@ class MissionAlert {
 }
 
 // ==========================================
-// 📋 ALERTE MODEL (pour le panneau notifications)
+// 📋 ALERTE MODEL
 // ==========================================
 
 class AlerteModel {
   final String id;
-  final String type;       // 'GEOGRAPHIQUE' | 'TRAJET'
+  final String type;
   final bool actif;
   final bool emailActif;
   final bool pushActif;
   final double? rayon;
 
-  // GEOGRAPHIQUE
   final String? villeNom;
   final double? latitude;
   final double? longitude;
 
-  // TRAJET
   final String? villeDepartNom;
   final double? latitudeDepart;
   final double? longitudeDepart;
@@ -369,28 +402,27 @@ class AlerteModel {
 
   factory AlerteModel.fromJson(Map<String, dynamic> json) {
     return AlerteModel(
-      id:               json['id']               as String? ?? '',
-      type:             json['type']             as String? ?? 'GEOGRAPHIQUE',
+      id:               _stringFromJson(json['id']),
+      type:             _stringFromJson(json['type'], 'GEOGRAPHIQUE'),
       actif:            json['actif']            as bool?   ?? true,
       emailActif:       json['emailActif']       as bool?   ?? false,
       pushActif:        json['pushActif']        as bool?   ?? false,
       rayon:            (json['rayon'] as num?)?.toDouble(),
-      villeNom:         json['villeNom']         as String?,
+      villeNom:         json['villeNom'] != null ? _stringFromJson(json['villeNom']) : null,
       latitude:         (json['latitude'] as num?)?.toDouble(),
       longitude:        (json['longitude'] as num?)?.toDouble(),
-      villeDepartNom:   json['villeDepartNom']   as String?,
+      villeDepartNom:   json['villeDepartNom'] != null ? _stringFromJson(json['villeDepartNom']) : null,
       latitudeDepart:   (json['latitudeDepart'] as num?)?.toDouble(),
       longitudeDepart:  (json['longitudeDepart'] as num?)?.toDouble(),
-      villeArriveeNom:  json['villeArriveeNom']  as String?,
+      villeArriveeNom:  json['villeArriveeNom'] != null ? _stringFromJson(json['villeArriveeNom']) : null,
       latitudeArrivee:  (json['latitudeArrivee'] as num?)?.toDouble(),
       longitudeArrivee: (json['longitudeArrivee'] as num?)?.toDouble(),
-      dateDepart:       json['dateDepart']       as String?,
-      dateDepartMax:    json['dateDepartMax']    as String?,
-      dateCreation:     json['dateCreation']     as String?,
+      dateDepart:       json['dateDepart'] != null ? _stringFromJson(json['dateDepart']) : null,
+      dateDepartMax:    json['dateDepartMax'] != null ? _stringFromJson(json['dateDepartMax']) : null,
+      dateCreation:     json['dateCreation'] != null ? _stringFromJson(json['dateCreation']) : null,
     );
   }
 
-  /// Label court pour affichage
   String get displayTitle {
     if (type == 'TRAJET') {
       return '${villeDepartNom ?? '?'} → ${villeArriveeNom ?? '?'}';
@@ -398,16 +430,12 @@ class AlerteModel {
     return villeNom ?? 'Position';
   }
 
-  /// Sous-titre
   String get displaySubtitle {
     final r = rayon != null ? '${rayon!.toInt()} km' : '';
-    if (type == 'TRAJET') {
-      return 'Alerte trajet • $r';
-    }
+    if (type == 'TRAJET') return 'Alerte trajet • $r';
     return 'Alerte géographique • $r';
   }
 
-  /// Date formatée
   String get formattedDate {
     if (dateCreation == null) return '';
     try {
@@ -453,7 +481,7 @@ class CommuneModel {
     }
 
     return CommuneModel(
-      nom:          json['nom'] as String,
+      nom:          _stringFromJson(json['nom']),
       latitude:     coordinates?[0],
       longitude:    coordinates?[1],
       codesPostaux: json['codesPostaux'] != null
@@ -487,8 +515,243 @@ class MapPointModel {
 // 🎯 ENUMS
 // ==========================================
 
-enum SearchMode {
-  text,
-  position,
-  trajet,
+enum SearchMode { text, position, trajet }
+
+// ==========================================
+// 📦 MODELS DETAIL
+// ==========================================
+
+class PartenaireModel extends Partenaire {
+  const PartenaireModel({
+    required super.id,
+    required super.nom,
+    required super.prenom,
+    required super.entiteGroupe,
+    super.entiteAgence,
+    required super.email,
+    required super.telephone,
+    super.logo,
+  });
+
+  factory PartenaireModel.fromJson(Map<String, dynamic> j) => PartenaireModel(
+        id: _intFromJson(j['id']),
+        nom: _stringFromJson(j['nom']),
+        prenom: _stringFromJson(j['prenom']),
+        entiteGroupe: _stringFromJson(j['entiteGroupe'], 'Partenaire'),
+        entiteAgence:
+            j['entiteAgence'] != null ? _stringFromJson(j['entiteAgence']) : null,
+        email: _stringFromJson(j['email']),
+        telephone: _stringFromJson(j['telephone']),
+        logo: j['logo'] != null ? _stringFromJson(j['logo']) : null,
+      );
+}
+
+int _intFromJson(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+String _stringFromJson(dynamic value, [String fallback = '']) {
+  if (value == null) return fallback;
+  if (value is String) return value;
+  return value.toString();
+}
+
+class AdresseModel extends Adresse {
+  const AdresseModel({
+    required super.villeNom,
+    required super.adresseComplete,
+    required super.typeLieu,
+    super.nomLieu,
+    super.latitude,
+    super.longitude,
+  });
+
+  factory AdresseModel.fromJson(Map<String, dynamic> j) => AdresseModel(
+        villeNom: _stringFromJson(j['villeNom'], 'Ville inconnue'),
+        adresseComplete: _stringFromJson(j['adresseComplete']),
+        typeLieu: _stringFromJson(j['typeLieu']),
+        nomLieu: j['nomLieu'] != null ? _stringFromJson(j['nomLieu']) : null,
+        latitude: (j['latitude'] as num?)?.toDouble(),
+        longitude: (j['longitude'] as num?)?.toDouble(),
+      );
+}
+
+class VehiculeModel extends Vehicule {
+  const VehiculeModel({
+    required super.marqueModele,
+    required super.immatriculation,
+    required super.typeVehicule,
+    required super.typeCarburant,
+    required super.nombrePlaces,
+    super.boiteVitesse,
+  });
+
+  factory VehiculeModel.fromJson(Map<String, dynamic> j) => VehiculeModel(
+        marqueModele: _stringFromJson(j['marqueModele'], 'Vehicule'),
+        immatriculation: _stringFromJson(j['immatriculation']),
+        typeVehicule: _stringFromJson(j['typeVehicule']),
+        typeCarburant: _stringFromJson(j['typeCarburant']),
+        nombrePlaces: _intFromJson(j['nombrePlaces']),
+        boiteVitesse:
+            j['boiteVitesse'] != null ? _stringFromJson(j['boiteVitesse']) : null,
+      );
+}
+
+class DisponibiliteModel extends Disponibilite {
+  const DisponibiliteModel({
+    required super.dateDebut,
+    required super.dateFin,
+    super.dateDepartMax,
+  });
+
+  factory DisponibiliteModel.fromJson(Map<String, dynamic> j) =>
+      DisponibiliteModel(
+        dateDebut: _stringFromJson(j['dateDebut']),
+        dateFin: _stringFromJson(j['dateFin']),
+        dateDepartMax: j['dateDepartMax'] != null
+            ? _stringFromJson(j['dateDepartMax'])
+            : null,
+      );
+}
+
+class CalculModel extends Calcul {
+  const CalculModel({
+    required super.distanceKm,
+    required super.montantTotal,
+    required super.fraisPeage,
+  });
+
+  factory CalculModel.fromJson(Map<String, dynamic> j) => CalculModel(
+        distanceKm: (j['distanceKm'] as num?)?.toDouble() ?? 0,
+        montantTotal: (j['montantTotal'] as num?)?.toDouble() ?? 0,
+        fraisPeage: (j['fraisPeage'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+// data/models/mission_model.dart
+
+class AgentModel extends Agent {
+  const AgentModel({
+    required super.id,
+    required super.nom,
+    required super.prenom,
+    required super.email,
+    super.telephone,
+    super.photo,
+  });
+
+  factory AgentModel.fromJson(Map<String, dynamic> j) => AgentModel(
+    id:         _stringFromJson(j['id']),
+    nom:        _stringFromJson(j['nom']),
+    prenom:     _stringFromJson(j['prenom']),
+    email:      _stringFromJson(j['email']),
+    telephone:  j['telephone'] != null ? _stringFromJson(j['telephone']) : null,
+    photo:      j['photo'] != null ? _stringFromJson(j['photo']) : null,
+  );
+}
+
+class NotificationModel extends Notification {
+  const NotificationModel({
+    required super.id,
+    required super.typeNotification,
+    required super.actif,
+    required super.nomContact,
+    required super.telephoneContact,
+  });
+
+  factory NotificationModel.fromJson(Map<String, dynamic> j) =>
+      NotificationModel(
+        id:                 _stringFromJson(j['id']),
+        typeNotification:   _stringFromJson(j['typeNotification']),
+        actif:              j['actif']              as bool? ?? false,
+        nomContact:         _stringFromJson(j['nomContact']),
+        telephoneContact:   _stringFromJson(j['telephoneContact']),
+      );
+}
+
+class ContratModel extends Contrat {
+  const ContratModel({
+    required super.prixParKm,
+    required super.depassementKilometrage,
+    required super.retardSansAvertissement,
+    required super.restitutionAutreEndroit,
+  });
+
+  factory ContratModel.fromJson(Map<String, dynamic> j) => ContratModel(
+    prixParKm:                  (j['prixParKm']                  as num?)?.toDouble() ?? 0,
+    depassementKilometrage:     (j['depassementKilometrage']     as num?)?.toDouble() ?? 0,
+    retardSansAvertissement:    (j['retardSansAvertissement']    as num?)?.toDouble() ?? 0,
+    restitutionAutreEndroit:    (j['restitutionAutreEndroit']    as num?)?.toDouble() ?? 0,
+  );
+}
+
+class MissionDetailModel extends MissionDetail {
+  @override
+  final PartenaireModel? partenaire;
+  @override
+  final AgentModel? agent;
+  @override
+  final VehiculeModel? vehicule;
+  @override
+  final AdresseModel? adresseDepart;
+  @override
+  final AdresseModel? adresseArrivee;
+  @override
+  final ContratModel? contrat;
+
+  const MissionDetailModel({
+    this.partenaire,
+    this.agent,
+    this.vehicule,
+    this.adresseDepart,
+    this.adresseArrivee,
+    this.contrat,
+    required super.id,
+    required super.statut,
+    super.commentaire,
+    required super.dateCreation,
+    super.disponibilite,
+    super.calculs,
+    super.notifications,
+    required super.isFavori,
+  });
+
+  factory MissionDetailModel.fromJson(Map<String, dynamic> j) =>
+      MissionDetailModel(
+        id:           _stringFromJson(j['id']),
+        statut:       _stringFromJson(j['statut']),
+        commentaire:  j['commentaire'] != null ? _stringFromJson(j['commentaire']) : null,
+        dateCreation: _stringFromJson(j['dateCreation']),
+        isFavori:     j['isFavori']     as bool? ?? false,
+        partenaire: j['partenaire'] != null
+            ? PartenaireModel.fromJson(j['partenaire'] as Map<String, dynamic>)
+            : null,
+        agent: j['agent'] != null
+            ? AgentModel.fromJson(j['agent'] as Map<String, dynamic>)
+            : null,
+        vehicule: j['vehicule'] != null
+            ? VehiculeModel.fromJson(j['vehicule'] as Map<String, dynamic>)
+            : null,
+        adresseDepart: j['adresseDepart'] != null
+            ? AdresseModel.fromJson(j['adresseDepart'] as Map<String, dynamic>)
+            : null,
+        adresseArrivee: j['adresseArrivee'] != null
+            ? AdresseModel.fromJson(j['adresseArrivee'] as Map<String, dynamic>)
+            : null,
+        disponibilite: j['disponibilite'] != null
+            ? DisponibiliteModel.fromJson(j['disponibilite'] as Map<String, dynamic>)
+            : null,
+        calculs: j['calculs'] != null
+            ? CalculModel.fromJson(j['calculs'] as Map<String, dynamic>)
+            : null,
+        notifications: (j['notifications'] as List<dynamic>? ?? [])
+            .map((n) => NotificationModel.fromJson(n as Map<String, dynamic>))
+            .toList(),
+        contrat: j['contrat'] != null
+            ? ContratModel.fromJson(j['contrat'] as Map<String, dynamic>)
+            : null,
+      );
 }

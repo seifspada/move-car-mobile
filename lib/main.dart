@@ -3,6 +3,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -16,6 +17,12 @@ const String _env = String.fromEnvironment('ENV', defaultValue: 'prod');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // ✅ Barre de navigation Android transparente (edge-to-edge)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
 
   // ✅ Formatage des dates en français
   await initializeDateFormatting('fr_FR', null);

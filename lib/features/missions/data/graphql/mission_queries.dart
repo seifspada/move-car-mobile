@@ -12,7 +12,14 @@ const String GET_MISSIONS_FOR_CARDS = '''
       montantTotal
       dateDebut
       dateDepartMax
+      isFavori
     }
+  }
+''';
+
+const String TOGGLE_FAVORI = '''
+  mutation ToggleFavori(\$missionId: String!) {
+    toggleFavori(missionId: \$missionId)  
   }
 ''';
 
@@ -221,6 +228,105 @@ const String GET_MY_ALERTES_WITH_TOKENS = '''
       dateDepart
       dateDepartMax
       dateCreation
+    }
+  }
+''';
+const String getMissionByIdQuery = r'''
+  query GetMissionById($id: String!) {
+    getMissionById(id: $id) {
+      id
+      statut
+      commentaire
+      dateCreation
+      partenaire {
+        id
+        entiteGroupe
+      }
+      agent {
+        id
+        nom
+        prenom
+        email
+        telephone
+        photo
+      }
+      vehicule {
+        id
+        typeVehicule
+        typeCarburant
+        marqueModele
+        immatriculation
+        nombrePlaces
+        boiteVitesse
+      }
+      adresseDepart {
+        id
+        villeNom
+        adresseComplete
+        typeLieu
+        nomLieu
+        latitude
+        longitude
+      }
+      adresseArrivee {
+        id
+        villeNom
+        adresseComplete
+        typeLieu
+        nomLieu
+        latitude
+        longitude
+      }
+      disponibilite {
+        id
+        dateDebut
+        dateFin
+        dateDepartMax
+      }
+      calculs {
+        id
+        distanceKm
+        fraisPeage
+        montantTotal
+      }
+      notifications {
+        id
+        typeNotification
+        actif
+        nomContact
+        telephoneContact
+      }
+      contrat {
+        prixParKm
+        depassementKilometrage
+        retardSansAvertissement
+        restitutionAutreEndroit
+      }
+    }
+  }
+''';
+// ─── Mutation créer une réservation ──────────────────────────────────────────
+ 
+const String createReservationMutation = r'''
+  mutation CreateReservation($input: CreateReservationInput!) {
+    createReservation(input: $input) {
+      success
+      message
+      code
+      reservation {
+        id
+        missionId
+        numeroReservation
+        statut
+        dateDepart
+        heureDepart
+        dateArrivee
+        heureArrivee
+        dureeEstimee
+        montantTotal
+        fraisPeage
+        distanceKm
+      }
     }
   }
 ''';

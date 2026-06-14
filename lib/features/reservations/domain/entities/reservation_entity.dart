@@ -1,5 +1,3 @@
-// lib/features/reservations/domain/entities/reservation_entity.dart
-
 class ReservationEntity {
   final String id;
   final String missionId;
@@ -27,6 +25,7 @@ class ReservationEntity {
   final String? dateAnnulation;
 
   final MissionSimple? mission;
+  final MissionSessionSimple? missionSession; // ✅
 
   const ReservationEntity({
     required this.id,
@@ -50,12 +49,35 @@ class ReservationEntity {
     this.dateConfirmationAdherent,
     this.dateAnnulation,
     this.mission,
+    this.missionSession, // ✅
   });
 }
 
 class MissionSimple {
   final String? villeDepart;
   final String? villeArrivee;
+  final double? latitudeArrivee;
+  final double? longitudeArrivee;
 
-  const MissionSimple({this.villeDepart, this.villeArrivee});
+  const MissionSimple({
+    this.villeDepart,
+    this.villeArrivee,
+    this.latitudeArrivee,
+    this.longitudeArrivee,
+  });
+}
+
+// ✅ nouveau
+class MissionSessionSimple {
+  final String id;
+  final String statut;
+  final String? dateDebut;
+  final String? dateFin;
+
+  const MissionSessionSimple({
+    required this.id,
+    required this.statut,
+    this.dateDebut,
+    this.dateFin,
+  });
 }
