@@ -22,6 +22,8 @@ class MissionSessionRepository {
   // HELPERS
   // ─────────────────────────────────────────
 
+  /// Lance une exception si la QueryResult contient des erreurs GraphQL ou réseau.
+  /// Distingue explicitement les erreurs GraphQL (schema) des erreurs réseau.
   void _handleErrors(QueryResult result, String operation) {
     if (result.hasException) {
       final gqlErrors = result.exception?.graphqlErrors ?? [];
@@ -39,23 +41,28 @@ class MissionSessionRepository {
   // GET SESSION BY RESERVATION
   // ─────────────────────────────────────────
 
+  /// FIX : Utilise getMyMissionSessions (valide) à la place de
+  /// getMissionSession (inexistant dans le schéma) puis filtre par reservationId.
   Future<MissionSessionEntity?> getSessionByReservation(
     String reservationId,
   ) async {
     final result = await client.query(
       QueryOptions(
-        document: gql(MissionSessionQueries.getMissionSession),
-        variables: {'reservationId': reservationId},
+        document: gql(MissionSessionQueries.getMyMissionSessions),
         fetchPolicy: FetchPolicy.networkOnly,
       ),
     );
 
-    _handleErrors(result, 'getMissionSession');
+    _handleErrors(result, 'getMyMissionSessions');
 
-    final data = result.data?['getMissionSession'];
-    if (data == null) return null;
+    final list = result.data?['getMyMissionSessions'] as List<dynamic>? ?? [];
+    final match = list.cast<Map<String, dynamic>>().firstWhere(
+          (s) => s['reservationId'] == reservationId,
+          orElse: () => <String, dynamic>{},
+        );
 
-    return MissionSessionModel.fromJson(data as Map<String, dynamic>);
+    if (match.isEmpty) return null;
+    return MissionSessionModel.fromJson(match);
   }
 
   // ─────────────────────────────────────────
@@ -122,51 +129,57 @@ class MissionSessionRepository {
   // ─────────────────────────────────────────
   // START SESSION
   // ─────────────────────────────────────────
-Future<MissionSessionEntity> startSession(
-  StartMissionSessionInputModel input,
-) async {
-  final result = await client.mutate(
-    MutationOptions(
-      document: gql(MissionSessionQueries.startMissionSession),
-      variables: {'input': input.toJson()},
-      // ✅ Ajout fetchPolicy
-      fetchPolicy: FetchPolicy.networkOnly,
-    ),
-  );
 
-  _handleErrors(result, 'startMissionSession');
-
-  final data = result.data?['startMissionSession'] as Map<String, dynamic>?;
-  if (data == null) {
-    throw const MissionSessionException(
-      'Réponse invalide du serveur lors du démarrage de session.',
+  /// La mutation retourne l'entité complète → pas besoin de refetch.
+  Future<MissionSessionEntity> startSession(
+    StartMissionSessionInputModel input,
+  ) async {
+    final result = await client.mutate(
+      MutationOptions(
+        document: gql(MissionSessionQueries.startMissionSession),
+        variables: {'input': input.toJson()},
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
     );
+
+    _handleErrors(result, 'startMissionSession');
+
+    final data = result.data?['startMissionSession'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw const MissionSessionException(
+        'Réponse invalide du serveur lors du démarrage de session.',
+      );
+    }
+    return MissionSessionModel.fromJson(data);
   }
-  return MissionSessionModel.fromJson(data);
-}
 
-Future<MissionSessionEntity> endSession(
-  EndMissionSessionInputModel input,
-) async {
-  final result = await client.mutate(
-    MutationOptions(
-      document: gql(MissionSessionQueries.endMissionSession),
-      variables: {'input': input.toJson()},
-      // ✅ Ajout fetchPolicy
-      fetchPolicy: FetchPolicy.networkOnly,
-    ),
-  );
+  // ─────────────────────────────────────────
+  // END SESSION
+  // ─────────────────────────────────────────
 
-  _handleErrors(result, 'endMissionSession');
-
-  final data = result.data?['endMissionSession'] as Map<String, dynamic>?;
-  if (data == null) {
-    throw const MissionSessionException(
-      'Réponse invalide du serveur lors de la fin de session.',
+  /// La mutation retourne l'entité complète → pas besoin de refetch.
+  Future<MissionSessionEntity> endSession(
+    EndMissionSessionInputModel input,
+  ) async {
+    final result = await client.mutate(
+      MutationOptions(
+        document: gql(MissionSessionQueries.endMissionSession),
+        variables: {'input': input.toJson()},
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
     );
+
+    _handleErrors(result, 'endMissionSession');
+
+    final data = result.data?['endMissionSession'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw const MissionSessionException(
+        'Réponse invalide du serveur lors de la fin de session.',
+      );
+    }
+    return MissionSessionModel.fromJson(data);
   }
-  return MissionSessionModel.fromJson(data);
-}
+
   // ─────────────────────────────────────────
   // UPLOAD PHOTOS
   // ─────────────────────────────────────────

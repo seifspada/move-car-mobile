@@ -8,11 +8,6 @@ import '../../data/repositories/mission_session_repository_impl.dart';
 import '../../domain/entities/mission_session_entity.dart';
 
 // ─────────────────────────────────────────
-// GRAPHQL CLIENT PROVIDER
-// Override this in your app with actual client
-// ─────────────────────────────────────────
-
-// ─────────────────────────────────────────
 // REPOSITORY PROVIDER
 // ─────────────────────────────────────────
 
@@ -22,124 +17,158 @@ final missionSessionRepositoryProvider = Provider<MissionSessionRepository>((ref
 });
 
 // ─────────────────────────────────────────
-// SESSION STATE NOTIFIER
+// SESSION STATE
 // ─────────────────────────────────────────
 
 class MissionSessionState {
   final MissionSessionEntity? session;
   final bool isLoading;
-  final String? error;
+
+  /// Erreur bloquante : la MUTATION elle-même a échoué.
+  /// L'UI doit afficher un message d'erreur clair et empêcher la navigation.
+  final String? mutationError;
+
+  /// Avertissement non-bloquant : la mutation a réussi mais le refetch
+  /// pour synchroniser l'état local a échoué.
+  /// L'UI peut naviguer mais afficher un toast/snackbar discret.
+  final String? refreshWarning;
 
   const MissionSessionState({
     this.session,
     this.isLoading = false,
-    this.error,
+    this.mutationError,
+    this.refreshWarning,
   });
 
   MissionSessionState copyWith({
     MissionSessionEntity? session,
     bool? isLoading,
-    String? error,
+    String? mutationError,
+    String? refreshWarning,
+    bool clearMutationError = false,
+    bool clearRefreshWarning = false,
   }) {
     return MissionSessionState(
       session: session ?? this.session,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      mutationError: clearMutationError ? null : (mutationError ?? this.mutationError),
+      refreshWarning: clearRefreshWarning ? null : (refreshWarning ?? this.refreshWarning),
     );
   }
+
+  /// Rétro-compatibilité : expose "error" pour les widgets existants qui
+  /// affichent state.error. Pointe vers mutationError (le seul cas bloquant).
+  String? get error => mutationError;
 
   bool get hasSession => session != null;
   bool get isEnCours => session?.statut == StatutSession.EN_COURS;
 }
+
+// ─────────────────────────────────────────
+// SESSION NOTIFIER
+// ─────────────────────────────────────────
 
 class MissionSessionNotifier extends StateNotifier<MissionSessionState> {
   final MissionSessionRepository _repo;
 
   MissionSessionNotifier(this._repo) : super(const MissionSessionState());
 
-  // ── Load session ──────────────────────────
+  // ── Load session (refetch initial) ─────────────────────────────
 
+  /// Charge la session depuis le backend via getMyMissionSessions.
+  /// Un échec ici n'est pas bloquant : on affiche juste un avertissement.
   Future<void> loadSession(String reservationId) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearMutationError: true, clearRefreshWarning: true);
     try {
       final session = await _repo.getSessionByReservation(reservationId);
       state = state.copyWith(session: session, isLoading: false);
     } on MissionSessionException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+      // Le chargement initial a échoué : on affiche un avertissement non-bloquant
+      // car l'utilisateur n'a encore rien soumis.
+      state = state.copyWith(
+        isLoading: false,
+        refreshWarning: e.message,
+      );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        refreshWarning: e.toString(),
+      );
     }
   }
 
-  // ── Start session ──────────────────────────
+  // ── Start session ──────────────────────────────────────────────
 
-Future<void> startSession(StartMissionSessionInputModel input) async {
-  state = state.copyWith(isLoading: true, error: null);
+  /// Lance la mutation startMissionSession.
+  /// - Si la MUTATION échoue → mutationError (bloquant, affiché dans l'UI).
+  /// - La mutation retourne l'entité complète → pas de refetch nécessaire.
+  Future<void> startSession(StartMissionSessionInputModel input) async {
+    state = state.copyWith(
+      isLoading: true,
+      clearMutationError: true,
+      clearRefreshWarning: true,
+    );
 
-  int attempt = 0;
-  const maxRetries = 3;
-
-  while (attempt < maxRetries) {
     try {
       final session = await _repo.startSession(input);
+      // La mutation a réussi et retourne les données complètes → mise à jour locale directe.
       state = state.copyWith(session: session, isLoading: false);
-      return;
-
+    } on MissionSessionException catch (e) {
+      // Erreur GraphQL ou réseau côté mutation → bloquant.
+      state = state.copyWith(isLoading: false, mutationError: e.message);
+      rethrow;
     } catch (e) {
-      attempt++;
-      final isTimeout = e.toString().contains('TimeoutException') ||
-          e.toString().contains('No stream event') ||
-          e.toString().contains('Délai dépassé');
-
-      if (!isTimeout || attempt >= maxRetries) {
-        final msg = isTimeout
-            ? 'Connexion trop lente. Vérifiez votre réseau et réessayez.'
-            : e.toString();
-        state = state.copyWith(isLoading: false, error: msg);
-        rethrow;
-      }
-
-      // Backoff : 2s, 4s, 6s
-      await Future.delayed(Duration(seconds: attempt * 2));
+      final msg = _friendlyError(e);
+      state = state.copyWith(isLoading: false, mutationError: msg);
+      rethrow;
     }
   }
-}
-  // ── End session ──────────────────────────
 
-Future<void> endSession(EndMissionSessionInputModel input) async {
-  state = state.copyWith(isLoading: true, error: null);
+  // ── End session ────────────────────────────────────────────────
 
-  int attempt = 0;
-  const maxRetries = 3;
+  /// Lance la mutation endMissionSession.
+  /// - Si la MUTATION échoue → mutationError (bloquant, affiché dans l'UI).
+  /// - La mutation retourne l'entité complète → pas de refetch nécessaire.
+  Future<void> endSession(EndMissionSessionInputModel input) async {
+    state = state.copyWith(
+      isLoading: true,
+      clearMutationError: true,
+      clearRefreshWarning: true,
+    );
 
-  while (attempt < maxRetries) {
     try {
       final session = await _repo.endSession(input);
+      // La mutation a réussi et retourne les données complètes → mise à jour locale directe.
       state = state.copyWith(session: session, isLoading: false);
-      return;
-
+    } on MissionSessionException catch (e) {
+      // Erreur GraphQL ou réseau côté mutation → bloquant.
+      state = state.copyWith(isLoading: false, mutationError: e.message);
+      rethrow;
     } catch (e) {
-      attempt++;
-      final isTimeout = e.toString().contains('TimeoutException') ||
-          e.toString().contains('No stream event') ||
-          e.toString().contains('Délai dépassé');
-
-      if (!isTimeout || attempt >= maxRetries) {
-        final msg = isTimeout
-            ? 'Connexion trop lente. Vérifiez votre réseau et réessayez.'
-            : e.toString();
-        state = state.copyWith(isLoading: false, error: msg);
-        rethrow;
-      }
-
-      // Backoff : 2s, 4s, 6s
-      await Future.delayed(Duration(seconds: attempt * 2));
+      final msg = _friendlyError(e);
+      state = state.copyWith(isLoading: false, mutationError: msg);
+      rethrow;
     }
   }
-}
 
   void clearError() {
-    state = state.copyWith(error: null);
+    state = state.copyWith(clearMutationError: true, clearRefreshWarning: true);
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────
+
+  /// Traduit les exceptions techniques en messages lisibles.
+  /// On distingue les erreurs réseau/timeout des erreurs inconnues.
+  String _friendlyError(Object e) {
+    final msg = e.toString();
+    final isNetwork = msg.contains('TimeoutException') ||
+        msg.contains('No stream event') ||
+        msg.contains('SocketException') ||
+        msg.contains('Connection refused');
+    if (isNetwork) {
+      return 'Connexion trop lente ou indisponible. Vérifiez votre réseau et réessayez.';
+    }
+    return msg;
   }
 }
 

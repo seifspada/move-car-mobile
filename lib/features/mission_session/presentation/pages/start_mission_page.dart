@@ -58,8 +58,28 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
       await ref
           .read(_sessionProvider.notifier)
           .loadSession(widget.reservationId);
-      final session = ref.read(_sessionProvider).session;
-      if (mounted && session != null && session.isEnCours) {
+      if (!mounted) return;
+
+      final stateNow = ref.read(_sessionProvider);
+
+      // Le refetch a pu échouer (refreshWarning) : on affiche un snackbar
+      // discret, NON bloquant — la page reste utilisable.
+      if (stateNow.refreshWarning != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Actualisation impossible. Vous pouvez quand même démarrer la mission.',
+            ),
+            backgroundColor: SessionTheme.warning,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+
+      final session = stateNow.session;
+      if (session != null && session.isEnCours) {
         _goToActive(session);
       }
     });
@@ -120,9 +140,7 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
             content: Text(e.toString()),
             backgroundColor: SessionTheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -148,9 +166,7 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
     final km = int.tryParse(_kmCtrl.text.replaceAll(' ', ''));
 
     try {
-      await ref
-          .read(_sessionProvider.notifier)
-          .startSession(
+      await ref.read(_sessionProvider.notifier).startSession(
             StartMissionSessionInputModel(
               reservationId: widget.reservationId,
               consentAccepted: true,
@@ -178,9 +194,6 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
         builder: (_) => ActiveMissionPage(
           reservationId: widget.reservationId,
           session: session,
-          latitudeArrivee: widget.latitudeArrivee,
-          longitudeArrivee: widget.longitudeArrivee,
-          villeArrivee: widget.villeArrivee,
         ),
       ),
     );
@@ -193,8 +206,7 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
     final state = ref.watch(_sessionProvider);
     final photos = ref.watch(prePhotosProvider);
 
-    final canSubmit =
-        _consentAccepted &&
+    final canSubmit = _consentAccepted &&
         _gpsGranted &&
         _lat != null &&
         photos.hasAllRequired(kPhotosRequisePreDepart) &&
@@ -289,16 +301,10 @@ class _StartMissionPageState extends ConsumerState<StartMissionPage> {
           const SizedBox(height: 20),
 
           // ── Erreur ────────────────────────────────
-        // ── Erreur ────────────────────────────────
-if (state.error != null) ...[
-  _ErrorBanner(
-    error: state.error!,
-    isTimeout: state.error!.contains('Connexion trop lente') ||
-        state.error!.contains('Délai dépassé'),
-    onRetry: _startMission,  // ← réessaie directement
-  ),
-  const SizedBox(height: 16),
-],
+          if (state.error != null) ...[
+            _ErrorBanner(error: state.error!),
+            const SizedBox(height: 16),
+          ],
 
           // ── Bouton démarrer ───────────────────────
           _StartButton(
@@ -397,9 +403,8 @@ class _GpsCard extends StatelessWidget {
                   )
                 : Icon(
                     hasGps ? Icons.gps_fixed : Icons.gps_not_fixed,
-                    color: hasGps
-                        ? SessionTheme.success
-                        : SessionTheme.textHint,
+                    color:
+                        hasGps ? SessionTheme.success : SessionTheme.textHint,
                     size: 22,
                   ),
           ),
@@ -412,9 +417,7 @@ class _GpsCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      hasGps
-                          ? 'Position GPS obtenue ✓'
-                          : 'Position GPS requise',
+                      hasGps ? 'Position GPS obtenue ✓' : 'Position GPS requise',
                       style: TextStyle(
                         color: hasGps
                             ? SessionTheme.success
@@ -466,10 +469,8 @@ class _GpsCard extends StatelessWidget {
               onPressed: onRequest,
               style: TextButton.styleFrom(
                 foregroundColor: SessionTheme.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               child: const Text(
                 'Activer',
@@ -523,7 +524,8 @@ class _ConsentClause extends StatelessWidget {
                 color: value ? SessionTheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: value ? SessionTheme.primary : SessionTheme.border,
+                  color:
+                      value ? SessionTheme.primary : SessionTheme.border,
                   width: 1.5,
                 ),
               ),
@@ -587,9 +589,7 @@ class _StartButton extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         height: 56,
         decoration: BoxDecoration(
-          gradient: canSubmit && !isLoading
-              ? SessionTheme.orangeGradient
-              : null,
+          gradient: canSubmit && !isLoading ? SessionTheme.orangeGradient : null,
           color: canSubmit && !isLoading ? null : SessionTheme.surface2,
           borderRadius: BorderRadius.circular(16),
           boxShadow: canSubmit && !isLoading ? SessionTheme.orangeGlow : null,
@@ -605,9 +605,7 @@ class _StartButton extends StatelessWidget {
                   width: 22,
                   height: 22,
                   child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
+                      color: Colors.white, strokeWidth: 2.5),
                 )
               : Row(
                   mainAxisSize: MainAxisSize.min,
@@ -621,7 +619,8 @@ class _StartButton extends StatelessWidget {
                     Text(
                       'Démarrer la mission',
                       style: TextStyle(
-                        color: canSubmit ? Colors.white : SessionTheme.textHint,
+                        color:
+                            canSubmit ? Colors.white : SessionTheme.textHint,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -644,25 +643,18 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-    label,
-    style: const TextStyle(
-      color: SessionTheme.textPrimary,
-      fontWeight: FontWeight.w600,
-      fontSize: 13,
-    ),
-  );
+        label,
+        style: const TextStyle(
+          color: SessionTheme.textPrimary,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+      );
 }
 
 class _ErrorBanner extends StatelessWidget {
   final String error;
-  final bool isTimeout;
-  final VoidCallback? onRetry;
-
-  const _ErrorBanner({
-    required this.error,
-    this.isTimeout = false,
-    this.onRetry,
-  });
+  const _ErrorBanner({required this.error});
 
   @override
   Widget build(BuildContext context) {
@@ -673,46 +665,17 @@ class _ErrorBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: SessionTheme.error.withOpacity(0.3)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.error_outline,
-                  color: SessionTheme.error, size: 18),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  error,
-                  style: const TextStyle(
-                      color: SessionTheme.textSecondary, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          if (isTimeout && onRetry != null) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh,
-                    size: 16, color: SessionTheme.error),
-                label: const Text(
-                  'Réessayer',
-                  style: TextStyle(color: SessionTheme.error),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                      color: SessionTheme.error.withOpacity(0.4)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                ),
-              ),
+          const Icon(Icons.error_outline, color: SessionTheme.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              error,
+              style: const TextStyle(
+                  color: SessionTheme.textSecondary, fontSize: 12),
             ),
-          ],
+          ),
         ],
       ),
     );

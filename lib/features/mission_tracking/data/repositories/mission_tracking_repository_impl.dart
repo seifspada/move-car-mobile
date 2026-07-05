@@ -10,6 +10,24 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
   final GraphQLClient client;
   MissionTrackingRepositoryImpl(this.client);
 
+  static Map<String, dynamic> buildUpdateLocationInput({
+    required String missionId,
+    required double latitude,
+    required double longitude,
+    double? accuracy,
+    double? speed,
+    required DateTime timestamp,
+  }) {
+    return {
+      'missionId': missionId,
+      'latitude': latitude,
+      'longitude': longitude,
+      if (accuracy != null) 'accuracy': accuracy,
+      if (speed != null && speed >= 0) 'speed': speed,
+      'timestamp': timestamp.toUtc().toIso8601String(),
+    };
+  }
+
   // ── helper centralisé ──────────────────────────────────
   void _handleErrors(QueryResult result, String operation) {
     if (!result.hasException) return;
@@ -39,20 +57,24 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
     required double latitude,
     required double longitude,
     double? accuracy,
+    double? speed,
     required DateTime timestamp,
   }) async {
-    final result = await client.mutate(MutationOptions(
-      document: gql(MissionTrackingQueries.updateLocation),
-      variables: {
-        'input': {
-          'missionId': missionId,
-          'latitude': latitude,
-          'longitude': longitude,
-          if (accuracy != null) 'accuracy': accuracy,
-          'timestamp': timestamp.toIso8601String(),
-        }
-      },
-    ));
+    final result = await client.mutate(
+      MutationOptions(
+        document: gql(MissionTrackingQueries.updateLocation),
+        variables: {
+          'input': buildUpdateLocationInput(
+            missionId: missionId,
+            latitude: latitude,
+            longitude: longitude,
+            accuracy: accuracy,
+            speed: speed,
+            timestamp: timestamp,
+          ),
+        },
+      ),
+    );
 
     _handleErrors(result, 'updateMissionLocation');
     return _trackingToEntity(
@@ -66,15 +88,17 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
     required double latitude,
     required double longitude,
   }) async {
-    final result = await client.query(QueryOptions(
-      document: gql(MissionTrackingQueries.checkArrival),
-      variables: {
-        'sessionId': sessionId,
-        'latitude': latitude,
-        'longitude': longitude,
-      },
-      fetchPolicy: FetchPolicy.networkOnly,
-    ));
+    final result = await client.query(
+      QueryOptions(
+        document: gql(MissionTrackingQueries.checkArrival),
+        variables: {
+          'sessionId': sessionId,
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
+    );
 
     _handleErrors(result, 'checkMissionArrival');
     final model = ArrivalCheckModel.fromJson(
@@ -91,11 +115,13 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
   Future<List<MissionTrackingEntity>> getTrackingHistory(
     String missionId,
   ) async {
-    final result = await client.query(QueryOptions(
-      document: gql(MissionTrackingQueries.getTrackingHistory),
-      variables: {'missionId': missionId},
-      fetchPolicy: FetchPolicy.networkOnly,
-    ));
+    final result = await client.query(
+      QueryOptions(
+        document: gql(MissionTrackingQueries.getTrackingHistory),
+        variables: {'missionId': missionId},
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
+    );
 
     _handleErrors(result, 'getMissionTrackingHistory');
     final list = result.data!['getMissionTrackingHistory'] as List;
@@ -113,19 +139,21 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
     required double longitude,
     List<String>? photos,
   }) async {
-    final result = await client.mutate(MutationOptions(
-      document: gql(MissionTrackingQueries.reportIncident),
-      variables: {
-        'input': {
-          'sessionId': sessionId,
-          'typeIncident': typeIncident,
-          'description': description,
-          'latitude': latitude,
-          'longitude': longitude,
-          if (photos != null) 'photos': photos,
-        }
-      },
-    ));
+    final result = await client.mutate(
+      MutationOptions(
+        document: gql(MissionTrackingQueries.reportIncident),
+        variables: {
+          'input': {
+            'sessionId': sessionId,
+            'typeIncident': typeIncident,
+            'description': description,
+            'latitude': latitude,
+            'longitude': longitude,
+            if (photos != null) 'photos': photos,
+          },
+        },
+      ),
+    );
 
     _handleErrors(result, 'reportMissionIncident');
     return _incidentToEntity(
@@ -139,16 +167,18 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
     required double latitudeFin,
     required double longitudeFin,
   }) async {
-    final result = await client.mutate(MutationOptions(
-      document: gql(MissionTrackingQueries.completeMission),
-      variables: {
-        'input': {
-          'missionId': missionId,
-          'latitudeFin': latitudeFin,
-          'longitudeFin': longitudeFin,
-        }
-      },
-    ));
+    final result = await client.mutate(
+      MutationOptions(
+        document: gql(MissionTrackingQueries.completeMission),
+        variables: {
+          'input': {
+            'missionId': missionId,
+            'latitudeFin': latitudeFin,
+            'longitudeFin': longitudeFin,
+          },
+        },
+      ),
+    );
 
     _handleErrors(result, 'completeMission');
   }
@@ -177,12 +207,14 @@ class MissionTrackingRepositoryImpl implements MissionTrackingRepository {
         latitude: m.latitude,
         longitude: m.longitude,
         medias: m.medias
-            .map((med) => MissionIncidentMediaEntity(
-                  id: med.id,
-                  cheminFichier: med.cheminFichier,
-                  tailleOctets: med.tailleOctets,
-                  ordre: med.ordre,
-                ))
+            .map(
+              (med) => MissionIncidentMediaEntity(
+                id: med.id,
+                cheminFichier: med.cheminFichier,
+                tailleOctets: med.tailleOctets,
+                ordre: med.ordre,
+              ),
+            )
             .toList(),
         resolvedBy: m.resolvedBy,
         resolutionNotes: m.resolutionNotes,

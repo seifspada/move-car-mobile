@@ -10,12 +10,14 @@ class UpdateLocationUseCase {
     required double latitude,
     required double longitude,
     double? accuracy,
+    double? speed,
   }) {
     return repository.updateLocation(
       missionId: missionId,
       latitude: latitude,
       longitude: longitude,
       accuracy: accuracy,
+      speed: speed,
       timestamp: DateTime.now(),
     );
   }

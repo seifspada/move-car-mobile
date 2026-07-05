@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:convoyeur_mobile/app/theme/app_colors.dart';
 import 'package:go_router/go_router.dart';
 import '../../domain/entities/reservation_entity.dart';
+import '../../../mission_session/domain/entities/mission_session_entity.dart';
 import 'cancel_modal.dart';
 import 'countdown_badge.dart';
 import 'reservation_status_badge.dart';
@@ -100,8 +101,16 @@ class _ReservationCardState extends State<ReservationCard>
     final d = _departDate;
     if (d == null) return false;
     return DateTime.now().isAfter(d) &&
-        widget.reservation.statut == 'CONFIRMED_BY_ADHERENT';
+        widget.reservation.statut == 'CONFIRMED_BY_ADHERENT' &&
+        widget.reservation.missionSession == null;
   }
+
+  // ── États mission session ──────────────────────────────
+  bool get _isEnCours =>
+      widget.reservation.missionSession?.statut == 'EN_COURS';
+
+  bool get _isTerminee =>
+      widget.reservation.missionSession?.statut == 'TERMINEE';
 
   // ── Permissions ────────────────────────────────────────
   bool get _canCancelPending =>
@@ -118,7 +127,9 @@ class _ReservationCardState extends State<ReservationCard>
         'CONFIRMED_BY_ADHERENT',
       ].contains(widget.reservation.statut) &&
       !_isWithin24h &&
-      !_isTooClose;
+      !_isTooClose &&
+      !_isEnCours &&
+      !_isTerminee;
 
   bool get _canConfirm => widget.reservation.statut == 'ACCEPTED_BY_AGENT';
 
@@ -128,10 +139,14 @@ class _ReservationCardState extends State<ReservationCard>
         'ACCEPTED_BY_AGENT',
         'CONFIRMED_BY_ADHERENT',
       ].contains(widget.reservation.statut) &&
-      _departDate != null;
+      _departDate != null &&
+      !_isEnCours &&
+      !_isTerminee;
 
   // ── Border color selon statut ──────────────────────────
   Color get _borderColor {
+    if (_isEnCours) return const Color(0xFFEAB308).withOpacity(0.5);
+    if (_isTerminee) return const Color(0xFF6B7280).withOpacity(0.4);
     switch (widget.reservation.statut) {
       case 'ACCEPTED_BY_AGENT':
         return const Color(0xFF3B82F6).withOpacity(0.4);
@@ -158,18 +173,8 @@ class _ReservationCardState extends State<ReservationCard>
 
   String _monthName(int m) {
     const months = [
-      'jan',
-      'fév',
-      'mar',
-      'avr',
-      'mai',
-      'juin',
-      'juil',
-      'aoû',
-      'sep',
-      'oct',
-      'nov',
-      'déc',
+      'jan', 'fév', 'mar', 'avr', 'mai', 'juin',
+      'juil', 'aoû', 'sep', 'oct', 'nov', 'déc',
     ];
     return months[m - 1];
   }
@@ -204,6 +209,52 @@ class _ReservationCardState extends State<ReservationCard>
     );
   }
 
+  // ✅ Navigation vers mission active (EN_COURS)
+  void _handleSuivieMission() {
+    final session = widget.reservation.missionSession;
+    final mission = widget.reservation.mission;
+    if (session == null) return;
+
+    // ✅ Convertir StatutSession depuis String
+    final statut = session.statut == 'EN_COURS'
+        ? StatutSession.EN_COURS
+        : StatutSession.TERMINEE;
+
+    // ✅ Parser les dates
+    final dateDebut = session.dateDebut != null
+        ? DateTime.tryParse(session.dateDebut!) ?? DateTime.now()
+        : DateTime.now();
+
+    final dateFin = session.dateFin != null
+        ? DateTime.tryParse(session.dateFin!)
+        : null;
+
+    context.go(
+      '/mission_active/${session.id}',
+      extra: {
+        'reservationId': widget.reservation.id,
+        'session': MissionSessionEntity(
+          id: session.id,
+          reservationId: widget.reservation.id,
+          missionId: widget.reservation.missionId,
+          consentAccepted: true,
+          dateConsentement: dateDebut,
+          latitudeDebut: 0.0,
+          longitudeDebut: 0.0,
+          dateDebut: dateDebut,
+          dateFin: dateFin,
+          statut: statut,
+          medias: const [],
+          dateCreation: dateDebut,
+          dateModification: dateDebut,
+        ),
+        'latitudeArrivee': mission?.latitudeArrivee,
+        'longitudeArrivee': mission?.longitudeArrivee,
+        'villeArrivee': mission?.villeArrivee,
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final r = widget.reservation;
@@ -226,6 +277,12 @@ class _ReservationCardState extends State<ReservationCard>
           if (_isMissionReady)
             BoxShadow(
               color: const Color(0xFF22C55E).withOpacity(0.12),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          if (_isEnCours)
+            BoxShadow(
+              color: const Color(0xFFEAB308).withOpacity(0.12),
               blurRadius: 20,
               spreadRadius: 2,
             ),
@@ -254,6 +311,18 @@ class _ReservationCardState extends State<ReservationCard>
                 color: const Color(0xFF22C55E),
                 icon: Icons.rocket_launch_rounded,
                 text: 'Mission prête — vous pouvez démarrer',
+              ),
+            if (_isEnCours)
+              _StatusBanner(
+                color: const Color(0xFFEAB308),
+                icon: Icons.directions_car_rounded,
+                text: 'Mission en cours d\'exécution',
+              ),
+            if (_isTerminee)
+              _StatusBanner(
+                color: const Color(0xFF6B7280),
+                icon: Icons.flag_rounded,
+                text: 'Mission terminée',
               ),
 
             // ── Corps ─────────────────────────────────
@@ -356,7 +425,7 @@ class _ReservationCardState extends State<ReservationCard>
                   ),
                   const SizedBox(height: 10),
 
-                  // ── Countdown ou Launch Mission ────────
+                  // ── Countdown ────────────────────────
                   if (_showCountdown) ...[
                     if (!_isMissionReady)
                       Text(
@@ -380,6 +449,22 @@ class _ReservationCardState extends State<ReservationCard>
                   // ── Bouton Launch Mission ──────────────
                   if (_isMissionReady) ...[
                     _LaunchMissionButton(onTap: _handleLaunchMission),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // ✅ Bouton Suivie Mission (EN_COURS) — jaune
+                  if (_isEnCours) ...[
+                    _SuivieMissionButton(onTap: _handleSuivieMission),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // ✅ Badge TERMINEE — avec heures début et fin
+                  if (_isTerminee) ...[
+                    _TermineeBadge(
+                      dateDebut: r.missionSession?.dateDebut, // ✅ ajouté
+                      dateFin: r.missionSession?.dateFin,
+                      formatDate: _formatDate,
+                    ),
                     const SizedBox(height: 10),
                   ],
 
@@ -439,68 +524,94 @@ class _ReservationCardState extends State<ReservationCard>
                       ),
                     ),
 
-                  // ── Actions ──────────────────────────
-                  Row(
-                    children: [
-                      // Annuler EN_ATTENTE
-                      if (_canCancelPending)
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Annuler la demande',
-                            icon: Icons.cancel_outlined,
-                            isLoading: widget.isActionLoading,
-                            style: _ActionStyle.outline,
-                            onTap: () => widget.onCancelPending(r.id),
+                  // ── Actions (masquées si EN_COURS ou TERMINEE) ──
+                  if (!_isEnCours && !_isTerminee)
+                    Row(
+                      children: [
+                        if (_canCancelPending)
+                          Expanded(
+                            child: _ActionButton(
+                              label: 'Annuler la demande',
+                              icon: Icons.cancel_outlined,
+                              isLoading: widget.isActionLoading,
+                              style: _ActionStyle.outline,
+                              onTap: () => widget.onCancelPending(r.id),
+                            ),
                           ),
-                        ),
 
-                      // Confirmer
-                      if (_canConfirm) ...[
-                        Expanded(
-                          child: _ActionButton(
-                            label: 'Confirmer',
-                            icon: Icons.check_circle_outline,
-                            isLoading: widget.isActionLoading,
-                            style: _ActionStyle.green,
-                            onTap: () => widget.onConfirm(r.id),
+                        if (_canConfirm) ...[
+                          Expanded(
+                            child: _ActionButton(
+                              label: 'Confirmer',
+                              icon: Icons.check_circle_outline,
+                              isLoading: widget.isActionLoading,
+                              style: _ActionStyle.green,
+                              onTap: () => widget.onConfirm(r.id),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
+                          const SizedBox(width: 8),
+                        ],
 
-                      // Annuler / Demande annulation
-                      if (_canCancelDirect || _canRequestCancellation) ...[
-                        _canConfirm
-                            ? _ActionButton(
-                                label: _isWithin24h
-                                    ? 'Annuler'
-                                    : 'Dem. annulation',
-                                icon: Icons.cancel_outlined,
-                                isLoading: widget.isActionLoading,
-                                style: _isWithin24h
-                                    ? _ActionStyle.red
-                                    : _ActionStyle.orange,
-                                compact: true,
-                                onTap: _handleCancelClick,
-                              )
-                            : Expanded(
-                                child: _ActionButton(
+                        if (_canCancelDirect || _canRequestCancellation) ...[
+                          _canConfirm
+                              ? _ActionButton(
                                   label: _isWithin24h
                                       ? 'Annuler'
-                                      : 'Demander annulation',
+                                      : 'Dem. annulation',
                                   icon: Icons.cancel_outlined,
                                   isLoading: widget.isActionLoading,
                                   style: _isWithin24h
                                       ? _ActionStyle.red
                                       : _ActionStyle.orange,
+                                  compact: true,
                                   onTap: _handleCancelClick,
+                                )
+                              : Expanded(
+                                  child: _ActionButton(
+                                    label: _isWithin24h
+                                        ? 'Annuler'
+                                        : 'Demander annulation',
+                                    icon: Icons.cancel_outlined,
+                                    isLoading: widget.isActionLoading,
+                                    style: _isWithin24h
+                                        ? _ActionStyle.red
+                                        : _ActionStyle.orange,
+                                    onTap: _handleCancelClick,
+                                  ),
                                 ),
-                              ),
-                        const SizedBox(width: 8),
-                      ],
+                          const SizedBox(width: 8),
+                        ],
 
-                      // Expand
-                      GestureDetector(
+                        // Expand
+                        GestureDetector(
+                          onTap: _toggleExpand,
+                          child: AnimatedRotation(
+                            turns: _expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 280),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceElevated,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: AppColors.textHint,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  // ── Expand button pour EN_COURS et TERMINEE ──
+                  if (_isEnCours || _isTerminee)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
                         onTap: _toggleExpand,
                         child: AnimatedRotation(
                           turns: _expanded ? 0.5 : 0,
@@ -521,8 +632,7 @@ class _ReservationCardState extends State<ReservationCard>
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
 
                   // ── Détails expandables ───────────────
                   SizeTransition(
@@ -557,6 +667,16 @@ class _ReservationCardState extends State<ReservationCard>
                                 label: 'Distance',
                                 value: '${r.distanceKm!.toStringAsFixed(1)} km',
                               ),
+                            if (r.missionSession?.dateDebut != null)
+                              _DetailItem(
+                                label: 'Démarrage',
+                                value: _formatDate(r.missionSession!.dateDebut),
+                              ),
+                            if (r.missionSession?.dateFin != null)
+                              _DetailItem(
+                                label: 'Terminée le',
+                                value: _formatDate(r.missionSession!.dateFin),
+                              ),
                           ],
                         ),
                         if (r.motifAnnulation != null) ...[
@@ -579,9 +699,7 @@ class _ReservationCardState extends State<ReservationCard>
                                 children: [
                                   const TextSpan(
                                     text: 'Motif annulation : ',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                    style: TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                   TextSpan(text: r.motifAnnulation),
                                 ],
@@ -780,7 +898,6 @@ class _ActionButton extends StatelessWidget {
 // ── Bouton Launch Mission ──────────────────────────────────
 class _LaunchMissionButton extends StatelessWidget {
   final VoidCallback onTap;
-
   const _LaunchMissionButton({required this.onTap});
 
   @override
@@ -814,30 +931,175 @@ class _LaunchMissionButton extends StatelessWidget {
                 color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.rocket_launch_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
+              child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 16),
             ),
             const SizedBox(width: 10),
             const Text(
               'Launch Mission',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.5),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_forward_rounded,
-              color: Colors.white,
-              size: 16,
+            const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ✅ Bouton Suivie Mission — jaune
+class _SuivieMissionButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _SuivieMissionButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 46,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEAB308), Color(0xFFCA8A04)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFEAB308).withOpacity(0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.directions_car_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Suivie Mission',
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ✅ Badge TERMINEE — avec heures de début et fin d'exécution
+class _TermineeBadge extends StatelessWidget {
+  final String? dateFin;
+  final String? dateDebut; // ✅ ajouté
+  final String Function(String?) formatDate;
+
+  const _TermineeBadge({
+    this.dateFin,
+    this.dateDebut, // ✅ ajouté
+    required this.formatDate,
+  });
+
+  // ✅ Extrait HH:mm depuis une chaîne ISO datetime
+  String _formatHeure(String? d) {
+    if (d == null) return '—';
+    try {
+      final dt = DateTime.parse(d);
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF6B7280).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF6B7280).withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.flag_rounded, color: Color(0xFF6B7280), size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mission terminée',
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // ✅ Ligne heures début → fin
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.play_circle_outline,
+                      color: Color(0xFF9CA3AF),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Démarrage : ${_formatHeure(dateDebut)}',
+                      style: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.stop_circle_outlined,
+                      color: Color(0xFF9CA3AF),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Arrêt : ${_formatHeure(dateFin)}',
+                      style: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+                if (dateFin != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Le ${formatDate(dateFin)}',
+                    style: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF6B7280),
+            size: 18,
+          ),
+        ],
       ),
     );
   }

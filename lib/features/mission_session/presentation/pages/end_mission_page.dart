@@ -230,7 +230,7 @@ class _EndMissionPageState extends ConsumerState<EndMissionPage> {
     );
   }
 
-  Widget _buildForm(dynamic state, bool canSubmit) {
+  Widget _buildForm(MissionSessionState state, bool canSubmit) {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [

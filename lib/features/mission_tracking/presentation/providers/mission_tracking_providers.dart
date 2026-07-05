@@ -31,17 +31,17 @@ final completeMissionUseCaseProvider = Provider((ref) {
 // ── État du tracking ──────────────────────────────────────
 
 class MissionTrackingState {
-  final List<LatLng> polylinePoints;    // historique GPS parcouru
-  final List<LatLng> routePolyline;     // ✅ NOUVEAU : trajet OSRM planifié
+  final List<LatLng> polylinePoints; // historique GPS parcouru
+  final List<LatLng> routePolyline; // ✅ NOUVEAU : trajet OSRM planifié
   final LatLng? currentPosition;
   final bool isArrived;
   final int distanceMetres;
-  final int dureeMinutes;             // ✅ NOUVEAU : durée estimée OSRM
-  final String heureArrivee;          // ✅ NOUVEAU : heure d'arrivée calculée
+  final int dureeMinutes; // ✅ NOUVEAU : durée estimée OSRM
+  final String heureArrivee; // ✅ NOUVEAU : heure d'arrivée calculée
   final String villeArrivee;
   final bool gpsActive;
   final bool isLoading;
-  final bool routeLoading;             // ✅ NOUVEAU : chargement de la route
+  final bool routeLoading; // ✅ NOUVEAU : chargement de la route
   final String? error;
 
   const MissionTrackingState({
@@ -143,6 +143,7 @@ class MissionTrackingNotifier extends StateNotifier<MissionTrackingState> {
     required double latitude,
     required double longitude,
     double? accuracy,
+    double? speed,
   }) async {
     final point = LatLng(latitude, longitude);
 
@@ -169,6 +170,7 @@ class MissionTrackingNotifier extends StateNotifier<MissionTrackingState> {
         latitude: latitude,
         longitude: longitude,
         accuracy: accuracy,
+        speed: speed,
       );
     } catch (_) {}
 
@@ -211,9 +213,9 @@ class MissionTrackingNotifier extends StateNotifier<MissionTrackingState> {
 
 final missionTrackingProvider = StateNotifierProvider.autoDispose
     .family<MissionTrackingNotifier, MissionTrackingState, String>(
-  (ref, missionId) => MissionTrackingNotifier(
-    ref.read(updateLocationUseCaseProvider),
-    ref.read(checkArrivalUseCaseProvider),
-    ref.read(completeMissionUseCaseProvider),
-  ),
-);
+      (ref, missionId) => MissionTrackingNotifier(
+        ref.read(updateLocationUseCaseProvider),
+        ref.read(checkArrivalUseCaseProvider),
+        ref.read(completeMissionUseCaseProvider),
+      ),
+    );

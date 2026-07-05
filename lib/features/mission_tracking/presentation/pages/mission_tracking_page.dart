@@ -72,6 +72,7 @@ class _MissionTrackingPageState extends ConsumerState<MissionTrackingPage> {
             latitude: (data['latitude'] as num).toDouble(),
             longitude: (data['longitude'] as num).toDouble(),
             accuracy: (data['accuracy'] as num?)?.toDouble(),
+            speed: (data['speed'] as num?)?.toDouble(),
           );
     });
   }
@@ -157,8 +158,8 @@ class _MissionTrackingPageState extends ConsumerState<MissionTrackingPage> {
           Expanded(
             child: TrackingMapWidget(
               polylinePoints: state.polylinePoints,
-              routePolyline: state.routePolyline,   // ✅ vraies données OSRM
-              routeLoading: state.routeLoading,     // ✅ indicateur chargement
+              routePolyline: state.routePolyline, // ✅ vraies données OSRM
+              routeLoading: state.routeLoading, // ✅ indicateur chargement
               currentPosition: state.currentPosition,
               destinationPosition: destination,
               villeArrivee: state.villeArrivee.isNotEmpty

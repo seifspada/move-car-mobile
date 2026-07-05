@@ -7,6 +7,7 @@ abstract class MissionTrackingRepository {
     required double latitude,
     required double longitude,
     double? accuracy,
+    double? speed,
     required DateTime timestamp,
   });
 

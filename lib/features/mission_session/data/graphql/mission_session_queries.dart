@@ -50,9 +50,13 @@ class MissionSessionQueries {
   // QUERIES
   // ─────────────────────────────────────────
 
-  static const String getMissionSession = '''
-    query GetMissionSession(\$reservationId: String!) {
-      getMissionSession(reservationId: \$reservationId) {
+  /// FIX : L'ancien champ "getMissionSession" n'existe PAS dans le schéma.
+  /// Il provoquait : "Cannot query field 'getMissionSession' on type 'Query'."
+  /// On utilise maintenant "getMyMissionSessions" (valide) et on filtre
+  /// par reservationId côté client dans le repository.
+  static const String getMyMissionSessions = '''
+    query GetMyMissionSessions {
+      getMyMissionSessions {
         id
         reservationId
         missionId

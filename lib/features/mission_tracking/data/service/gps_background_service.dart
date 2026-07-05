@@ -59,8 +59,8 @@ void onBackgroundStart(ServiceInstance service) async {
     await service.stopSelf();
   });
 
-  // Boucle GPS toutes les 30 secondes
-  Timer.periodic(const Duration(seconds: 30), (timer) async {
+  // Boucle GPS toutes les secondes pour alimenter l’API en temps réel
+  Timer.periodic(const Duration(seconds: 1), (timer) async {
     if (currentMissionId == null || currentSessionId == null) return;
 
     try {
@@ -75,7 +75,10 @@ void onBackgroundStart(ServiceInstance service) async {
         'latitude': position.latitude,
         'longitude': position.longitude,
         'accuracy': position.accuracy,
-        'timestamp': DateTime.now().toIso8601String(),
+        if (position.speed >= 0) 'speed': position.speed,
+        'timestamp': (position.timestamp ?? DateTime.now())
+            .toUtc()
+            .toIso8601String(),
       });
     } catch (e) {
       // Pas de position disponible — on ignore silencieusement
